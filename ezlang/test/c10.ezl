@@ -1,0 +1,20 @@
+{ Sample program in EZ language -
+  silly program to handle some corner cases.
+}
+
+program silly;
+var
+    int xxxx;
+    int yyy;
+    int longidentifier;
+begin
+		{
+    write "Silly program.\n";
+    write 4 + 3 * 2;
+    write "Silly program.\n";
+    xxxx := 4;
+    longidentifier := 4;
+    yyy := longidentifier;
+    write (xxxx * yyy) / longidentifier;
+		}
+end

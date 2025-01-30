@@ -1,2 +1,8 @@
-# compilador
-Compilador desenvolvido para a disciplina de Compiladores
+scanner/lexer -> flex (reads lexer.l)
+
+parser -> bison (reads parser.y)
+
+semantic analysis -> bison
+
+
+

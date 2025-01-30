@@ -1,0 +1,46 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Ilib",
+      "src/scanner.c"
+    ],
+    "directory": "/home/carlos/tmp/ezlang",
+    "file": "/home/carlos/tmp/ezlang/src/scanner.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Ilib",
+      "src/parser.c"
+    ],
+    "directory": "/home/carlos/tmp/ezlang",
+    "file": "/home/carlos/tmp/ezlang/src/parser.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Ilib",
+      "src/vector.c"
+    ],
+    "directory": "/home/carlos/tmp/ezlang",
+    "file": "/home/carlos/tmp/ezlang/src/vector.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Wall",
+      "-Ilib",
+      "src/TokenData.c"
+    ],
+    "directory": "/home/carlos/tmp/ezlang",
+    "file": "/home/carlos/tmp/ezlang/src/TokenData.c"
+  }
+]
