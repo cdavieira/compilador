@@ -1,6 +1,11 @@
+# DOING
 * [ ] fazer o bind correto de variaveis do tipo string e array
 * [ ] guardar as variaveis que foram utilizadas em expressoes num vector
 separado e checar se ha algum conflito de nomes
 * [ ] indicar quais variaveis são parametros na vartable das varfuncs
 * [ ] checar se a redeclaração de uma funcao nao conflita com a lista de
-* parametros
+
+* [ ] Checar se os parametros das funcoes tem o mesmo tipo daqueles que sao passados
+* [ ] Passar o retorno da funcao para o tipo da expressao
+
+# DONE

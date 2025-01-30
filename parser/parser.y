@@ -18,15 +18,18 @@
 #include "VarTable.h"
 #include "FuncTable.h"
 #include "Literal.h"
+#include "Vector.h"
 
 typedef int (*fp_bin_op)(Literal*, Literal*, Literal*);
 
 extern int yylineno;
 int function_declared;
 int params_count;
+int fcall_active;
 enum Type vartype;
 ScopeManager* scope_manager;
 FuncTable* functable;
+Vector* funcargs;
 
 int yylex(void);
 void yyerror(char const *s);
@@ -37,6 +40,7 @@ void parser_info(void);
 
 void enter_scope(void);
 void exit_scope(void);
+void assign_to_expr(Literal* src, Literal* expr);
 
 void add_var_declaration(char* name, enum Type type);
 void check_var_declaration(char* name);
@@ -169,7 +173,14 @@ init_declarator:
 ;
 
 declarator_func:
-  type_specifier ID LPAR { params_count = 0; enter_scope(); } opt_func_paramlist RPAR declarator_func_end { exit_scope(); add_function_declaration($2, $1); }
+  type_specifier ID LPAR {
+	params_count = 0;
+	enter_scope();
+  }
+  opt_func_paramlist RPAR declarator_func_end {
+	add_function_declaration($2, $1);
+	exit_scope();
+  }
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
@@ -255,7 +266,7 @@ fcall_stmt:
 ;
 
 expr:
-  LPAR expr RPAR            { $$ = $2 ; }
+  LPAR expr RPAR            { if(fcall_active == 1){}; $$ = $2 ; }
 | ID                        { check_var_declaration($1); var_to_expr($1, &$$); }
 | INTVAL                    { $$ = $1; }
 | FLOATVAL                  { $$ = $1; }
@@ -277,17 +288,19 @@ expr:
 | MINUS FLOATVAL            { $$ = $2; }
 | PLUS FLOATVAL             { $$ = $2; }
 | fcall                     {  }
+// int sum(int n1, int n2);
+// int a = sum(1, 2, "asdasd", variavel);
 | AMP ID                    { check_var_declaration($2); }
 | ID LBRACKET expr RBRACKET { check_var_declaration($1); }
 ;
 
 fcall:
-  fcaller LPAR RPAR         { /* lmao how do i do this */ }
-| fcaller LPAR exprs RPAR   { /* lmao how do i do this */ }
+  fcaller LPAR RPAR         { fcall_active = 0; }
+| fcaller LPAR exprs RPAR   { fcall_active = 0; }
 ;
 
 fcaller:
-  ID      { check_function_declaration($1); }
+  ID      { check_function_declaration($1); fcall_active = 1; }
 | PRINTF
 | SCANF
 ;
@@ -315,18 +328,18 @@ void exit_scope(void){
 }
 
 void add_var_declaration(char* name, enum Type type){
-	if(type == TYPE_VOID){
-		printf("SEMANTIC ERROR (%d): variable %s has been declared with type VOID\n", var->line, name);
-		exit(1);
-	}
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
 	if(scope_add(scope, name, yylineno, type) == -1){
 		Variable* var = scope_search_by_name(scope, name);
 		printf("SEMANTIC ERROR (%d): variable %s has been declared already\n", var->line, name);
+		exit(1);
 	}
-	//else{
-	//	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
-	//}
+	if(type == TYPE_VOID){
+		Variable* var = scope_search_by_name(scope, name);
+		printf("SEMANTIC ERROR (%d): variable %s has been declared with type VOID\n", var->line, name);
+		exit(1);
+	}
+	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
 }
 
 void check_var_declaration(char* name){
@@ -414,13 +427,17 @@ void check_assignment(Literal* op1, Literal* res){
 void parser_init(void){
 	functable = func_table_new();
 	scope_manager = scope_manager_new();
+	funcargs = vector_new(12);
 }
 
 void parser_deinit(void){
 	scope_manager_destroy(&scope_manager);
 	func_table_destroy(&functable);
+	vector_destroy(&funcargs, NULL);
+	funcargs = vector_new(12);
 }
 
 void parser_info(void){
 	scope_manager_print(scope_manager);
+	
 }

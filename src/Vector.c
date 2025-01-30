@@ -109,7 +109,6 @@ void* vector_pop(Vector* const arr){
 
 
 
-
 int vector_is_empty(const Vector* const arr){
 	return !arr->size;
 }

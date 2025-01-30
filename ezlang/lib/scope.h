@@ -40,12 +40,12 @@ Scope* scope_manager_search_by_name(ScopeManager* manager, char* name);
 
 
 
-/* FuncVar */
-typedef struct FuncVar FuncVar;
+/* Function */
+typedef struct Function Function;
 
-FuncVar* func_new(char* name, Scope* scope, enum Type ret);
-FuncVar* func_destroy(FuncVar* func);
-FuncVar* func_search(FuncVar* func, char* name);
+Function* func_new(char* name, Scope* scope, enum Type ret);
+Function* func_destroy(Function* func);
+Function* func_search(Function* func, char* name);
 
 
 

@@ -220,30 +220,30 @@ static void int_destroy(int* value){
 
 
 
-/* FuncVar */
+/* Function */
 
-struct FuncVar {
+struct Function {
 	char* name;
 	Scope* scope;
 	enum Type ret;
 };
 
-static int func_compare_name(FuncVar* func, char* name);
+static int func_compare_name(Function* func, char* name);
 
-FuncVar* func_new(char* name, Scope* scope, enum Type ret){
-	FuncVar* func = malloc(sizeof(FuncVar));		
+Function* func_new(char* name, Scope* scope, enum Type ret){
+	Function* func = malloc(sizeof(Function));		
 	func->name = name;
 	func->ret = ret;
 	func->scope = scope;
 	return func;
 }
 
-FuncVar* func_destroy(FuncVar* func){
+Function* func_destroy(Function* func){
 	free(func);
 	return NULL;
 }
 
-static int func_compare_name(FuncVar* func, char* name){
+static int func_compare_name(Function* func, char* name){
 	return strcmp(func->name, name) == 0;
 }
 
@@ -272,12 +272,12 @@ int func_table_add(FuncTable* table, char* name, Scope* scope, enum Type ret){
 	if(func_table_search(table, name) != -1){
 		return -1;
 	}
-	FuncVar* func = func_new(name, scope, ret);
+	Function* func = func_new(name, scope, ret);
 	vector_append(table->functions, func);
 	return 0;
 }
 
 int func_table_search(FuncTable* table, char* name){
-	FuncVar* func = (FuncVar*) vector_search(table->functions, name, (int (*)(void*, void*)) func_compare_name);
+	Function* func = (Function*) vector_search(table->functions, name, (int (*)(void*, void*)) func_compare_name);
 	return func == NULL? -1 : 1;
 }
