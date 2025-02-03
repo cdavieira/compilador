@@ -26,23 +26,7 @@ typedef struct Variable {
 	Literal token;
 } Variable;
 
-//typedef struct Operator {
-//	char* name;
-//	enum {
-//	  OPERATOR_BINARY_SUM,
-//	  OPERATOR_BINARY_SUB,
-//	  OPERATOR_BINARY_MUL,
-//	  OPERATOR_BINARY_DIV,
-//	  OPERATOR_BINARY_AND,
-//	  OPERATOR_BINARY_OR,
-//	  OPERATOR_BINARY_LT,
-//	  OPERATOR_BINARY_GT,
-//	  OPERATOR_BINARY_NE,
-//	  OPERATOR_BINARY_EQ,
-//	  OPERATOR_UNARY_ASSIGN,
-//	} type;
-//} Operator;
-
+const char* type_get_name(enum Type type);
 const char* literal_get_typename(const Literal* td);
 int literal_sum(Literal* op1, Literal* op2, Literal* res);
 int literal_sub(Literal* op1, Literal* op2, Literal* res);

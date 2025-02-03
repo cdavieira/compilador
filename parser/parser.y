@@ -23,7 +23,7 @@
 typedef int (*fp_bin_op)(Literal*, Literal*, Literal*);
 
 extern int yylineno;
-int function_declared;
+int function_definition;
 int params_count;
 int fcall_active;
 enum Type vartype;
@@ -47,7 +47,7 @@ void check_var_declaration(char* name);
 Variable* get_var(char* name);
 void var_to_expr(char* name, Literal* exp);
 
-void add_function_declaration(char* name, enum Type type);
+int add_function_declaration(char* name, enum Type type);
 void check_function_declaration(char* name);
 
 void binary_operation(Literal* op1, Literal* op2, Literal* res, fp_bin_op bin_op);
@@ -178,15 +178,17 @@ declarator_func:
 	enter_scope();
   }
   opt_func_paramlist RPAR declarator_func_end {
-	add_function_declaration($2, $1);
+	if(add_function_declaration($2, $1) == -1){
+		exit(1);
+	}
 	exit_scope();
   }
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
 declarator_func_end:
-  DELI        { function_declared = 1; }
-| func_block  { function_declared = 0; }
+  DELI        { function_definition = 0; }
+| func_block  { function_definition = 1; }
 ;
 
 opt_func_paramlist:
@@ -312,10 +314,10 @@ exprs:
 
 /* WARNING: o tipo void deverá ser tratado durante a analise semântica: NÂO permitir a declaração de variáveis desse tipo. */
 type_specifier:
-  INT     { vartype = TYPE_INT;    }
-| CHAR    { vartype = TYPE_CHAR;   }
-| FLOAT   { vartype = TYPE_FLT;    }
-| VOID    { vartype = TYPE_VOID;   }
+  INT     { vartype = TYPE_INT;  $$ = vartype; }
+| CHAR    { vartype = TYPE_CHAR; $$ = vartype; }
+| FLOAT   { vartype = TYPE_FLT;  $$ = vartype; }
+| VOID    { vartype = TYPE_VOID; $$ = vartype; }
 ;
 
 %%
@@ -366,21 +368,17 @@ void var_to_expr(char* name, Literal* exp){
 	exp->value = var->token.value;
 }
 
-void add_function_declaration(char* name, enum Type type){
+int add_function_declaration(char* name, enum Type type){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
-	if(function_declared == 1){
-		if(func_table_add(functable, name, scope, type, params_count) == -1){
-			printf("SEMANTIC WARNING (%d): function %s has been declared already\n", yylineno, name);
-			return;
+	if(func_table_add(functable, name, scope, type, params_count, function_definition) == -1){
+		if(function_definition){
+			printf("SEMANTIC ERROR (%d): function %s has been defined already\n", yylineno, name);
+			return -1;
 		}
-		return ;
-	}
 
-	//func definition
-	if(func_table_add(functable, name, scope, type, params_count) == -1){
-		printf("SEMANTIC ERROR (%d): function %s has been defined already\n", yylineno, name);
-		return;
+		printf("SEMANTIC WARNING (%d): function %s has been declared already\n", yylineno, name);
 	}
+	return 0;
 }
 
 void check_function_declaration(char* name){
@@ -417,11 +415,11 @@ void binary_operation(Literal* op1, Literal* op2, Literal* res, fp_bin_op bin_op
 }
 
 void check_assignment(Literal* op1, Literal* res){
-    if(literal_assign(op1, res) == -1){
-      printf("SEMANTIC ERROR (%d): ", yylineno);
-      printf("incompatible types for operator '=', ");
-      printf("LHS is '%s' and RHS is '%s'.\n", literal_get_typename(res), literal_get_typename(op1));
-    }
+	if(literal_assign(op1, res) == -1){
+		printf("SEMANTIC ERROR (%d): ", yylineno);
+		printf("incompatible types for operator '=', ");
+		printf("LHS is '%s' and RHS is '%s'.\n", literal_get_typename(res), literal_get_typename(op1));
+	}
 }
 
 void parser_init(void){
@@ -434,10 +432,9 @@ void parser_deinit(void){
 	scope_manager_destroy(&scope_manager);
 	func_table_destroy(&functable);
 	vector_destroy(&funcargs, NULL);
-	funcargs = vector_new(12);
 }
 
 void parser_info(void){
 	scope_manager_print(scope_manager);
-	
+	func_table_print(functable);
 }
