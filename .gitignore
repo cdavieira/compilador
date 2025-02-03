@@ -1,1 +1,2 @@
-home/
+.cache/
+compile_commands.json

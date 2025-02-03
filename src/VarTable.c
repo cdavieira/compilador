@@ -38,7 +38,6 @@ Variable* vartable_search(VarTable* vt, const char* s) {
 
 void vartable_print(VarTable* vt){
 	printf("Variables table:\n");
-
 	Variable* var;
 	const size_t size = vector_get_size(vt->t);
 	for (int i = 0; i < size; i++) {

@@ -57,9 +57,8 @@ static const enum BinaryOperationTable assign_table_lookup[][4] = {
 	{EE, OK, OK, OK},
 };
 
-
-const char* literal_get_typename(const Literal* td){
-	switch(td->type){
+const char* type_get_name(enum Type type){
+	switch(type){
 		case TYPE_INT:
 			return "int";
 		case TYPE_FLT:
@@ -72,6 +71,10 @@ const char* literal_get_typename(const Literal* td){
 			return "void";
 	}
 	return "unknown typename";
+}
+
+const char* literal_get_typename(const Literal* td){
+	return type_get_name(td->type);
 }
 
 
