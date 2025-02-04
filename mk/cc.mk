@@ -2,7 +2,7 @@ CC := gcc
 
 CFLAGS :=
 
-CFLAGS := -Wall -I$(srcdir)/lib -DDEBUG
+CFLAGS := -Wall -I$(srcdir)/lib
 
 # -ll: linkar com o shared object associado ao flex (opcional)
 # CFLAGS += -ll

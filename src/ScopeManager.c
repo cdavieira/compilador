@@ -77,7 +77,7 @@ void scope_manager_enter(ScopeManager* manager){
 	stack_push(manager->scope_tracker, prev_scope);
 
 	//entering a new scope (in a deeper level)
-#ifdef DEBUG
+#ifdef DEBUG_SCOPE
 	printf("Entering new scope (prev = %d, next = %d, depth = %d)\n", *prev_scope, manager->id+1, manager->depth+1);
 #endif
 
@@ -102,7 +102,7 @@ void scope_manager_exit(ScopeManager* manager){
 	int_destroy(v);
 	manager->depth--;
 
-#ifdef DEBUG
+#ifdef DEBUG_SCOPE
 	printf("Exiting scope (prev = %d, next = %d, depth = %d)\n", old_scope, manager->current, manager->depth);
 #endif
 }

@@ -5,5 +5,5 @@ int f(float f, int i){
 
 int main(){
     int b = 1;
-    int a = f(b, 1.5);
+    float a = f(b, 1.5);
 }

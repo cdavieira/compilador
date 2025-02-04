@@ -15,5 +15,6 @@ int main(void){
 	int num1 = 77;
 	int num2 = 14;
 	int res = mdc(num1, num2);
+
 	return 0;
 }

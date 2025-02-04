@@ -22,6 +22,9 @@ include mk/flex.mk
 include mk/bison.mk
 include mk/valgrind.mk
 
+# CFLAGS += -DDEBUG_SCOPE
+# CFLAGS += -DDEBUG_PARSER
+
 obj:
 	mkdir $@
 

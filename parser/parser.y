@@ -221,7 +221,7 @@ func_param:
  * da lista de argumentos) */
 func_block:
   LCURLY RCURLY
-| LCURLY block_item_list RCURLY
+| LCURLY { function_definition = 0; if(add_function_declaration(funcname, retvartype) == -1){} function_definition = 1; } block_item_list RCURLY
 
 block:
   LCURLY RCURLY
@@ -255,7 +255,7 @@ jump_stmt:
 ;
 
 while_stmt:
-  WHILE LPAR expr RPAR block
+  WHILE LPAR expr RPAR block   { check_if_while_condition(&$3); }
 ;
 
 if_stmt:
@@ -345,7 +345,9 @@ void add_var_declaration(char* name, enum Type type){
 		printf("SEMANTIC ERROR (%d): variable %s has been declared with type VOID\n", var->line, name);
 		exit(1);
 	}
+#ifdef DEBUG_SCOPE
 	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
+#endif
 }
 
 void check_var_declaration(char* name){
@@ -400,6 +402,10 @@ int check_function_call(char* name){
 	}
 #undef STRING_EQ
 	Function* f = func_table_search(functable, name);
+	if(f == NULL){
+		return -1;
+	}
+
 	Scope* scope = func_get_scope(f);
 	VarTable* vt = scope_get_vartable(scope);
 	const int nparams = func_get_nparams(f);
@@ -441,7 +447,7 @@ void check_if_while_condition(Literal* exp){
 		case TYPE_STR:
 		case TYPE_CHAR:
 		default:
-		fprintf(stderr, "SEMANTIC ERROR (%d): conditional expression in IF/REPEAT", yylineno);
+		fprintf(stderr, "SEMANTIC ERROR (%d): conditional expression in IF/WHILE", yylineno);
 		fprintf(stderr, " is '%s' instead of 'int'\n", literal_get_typename(exp));
 			break;
 	}
@@ -478,6 +484,8 @@ void parser_deinit(void){
 }
 
 void parser_info(void){
+#ifdef DEBUG_PARSER
 	scope_manager_print(scope_manager);
 	func_table_print(functable);
+#endif
 }
