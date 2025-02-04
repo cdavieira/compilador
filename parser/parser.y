@@ -6,8 +6,10 @@
  */
 
 /* https://www.gnu.org/software/bison/manual/html_node/_0025define-Summary.html */
-%define parse.error verbose
-%define parse.lac full
+%define "parse.error" "verbose"
+%define "parse.lac" "full"
+%define "api.header.include" "./lib/parser.tab.h"
+
 
 %{
 #include <stdio.h>
@@ -123,7 +125,7 @@ union Token {
 %left STAR DIVISION MODULUS
 
 %nterm <t> type_specifier
-%nterm <l> expr
+%nterm <l> expr exprs
 %%
 
 /* Recursos fora do escopo desse parser:
@@ -266,9 +268,9 @@ assign_stmt:
 fcall_stmt:
 	fcall DELI
 ;
-
+func(4, 5)
 expr:
-  LPAR expr RPAR            { if(fcall_active == 1){}; $$ = $2 ; }
+  LPAR expr RPAR            { $$ = $2 ; }
 | ID                        { check_var_declaration($1); var_to_expr($1, &$$); }
 | INTVAL                    { $$ = $1; }
 | FLOATVAL                  { $$ = $1; }
@@ -308,8 +310,8 @@ fcaller:
 ;
 
 exprs:
-  expr
-| expr COMMA exprs
+  expr                  { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; $$ = $1 ; }
+| expr COMMA exprs      { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; $$ = $1 ; }
 ;
 
 /* WARNING: o tipo void deverá ser tratado durante a analise semântica: NÂO permitir a declaração de variáveis desse tipo. */

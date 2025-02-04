@@ -57,8 +57,9 @@ static const enum BinaryOperationTable assign_table_lookup[][4] = {
 	{EE, OK, OK, OK},
 };
 
-const char* type_get_name(enum Type type){
-	switch(type){
+
+const char* literal_get_typename(const Literal* td){
+	switch(td->type){
 		case TYPE_INT:
 			return "int";
 		case TYPE_FLT:
@@ -71,10 +72,6 @@ const char* type_get_name(enum Type type){
 			return "void";
 	}
 	return "unknown typename";
-}
-
-const char* literal_get_typename(const Literal* td){
-	return type_get_name(td->type);
 }
 
 
@@ -97,7 +94,7 @@ int literal_ ## NAME ( \
 			/* res->value.i = op1->value.i OPERATION op2->value.c; */ \
 			break; \
 		case IF: \
-			res->type = TYPE_INT; \
+			res->type = TYPE_FLT; \
 			/* res->value.f = ((float)op1->value.i) OPERATION op2->value.f; */ \
 			break; \
 		case FF: \
