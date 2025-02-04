@@ -79,11 +79,11 @@ macro           ^#.*
 "inline"       {CMD(INLINE)}
 "int"          {CMD(INT)}
 "long"         {CMD(LONG)}
-"printf"       {CMD(PRINTF)}
+"printf"       {save_id(); CMD(PRINTF)}
 "register"     {CMD(REGISTER)}
 "restrict"     {CMD(RESTRICT)}
 "return"       {CMD(RETURN)}
-"scanf"        {CMD(SCANF)}
+"scanf"        {save_id(); CMD(SCANF)}
 "short"        {CMD(SHORT)}
 "signed"       {CMD(SIGNED)}
 "sizeof"       {CMD(SIZEOF)}

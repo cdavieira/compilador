@@ -6,9 +6,8 @@
  */
 
 /* https://www.gnu.org/software/bison/manual/html_node/_0025define-Summary.html */
-%define "parse.error" "verbose"
-%define "parse.lac" "full"
-%define "api.header.include" "./lib/parser.tab.h"
+%define parse.error verbose
+%define parse.lac full
 
 
 %{
@@ -28,7 +27,9 @@ extern int yylineno;
 int function_definition;
 int params_count;
 int fcall_active;
+char* funcname;
 enum Type vartype;
+enum Type retvartype;
 ScopeManager* scope_manager;
 FuncTable* functable;
 Vector* funcargs;
@@ -51,6 +52,8 @@ void var_to_expr(char* name, Literal* exp);
 
 int add_function_declaration(char* name, enum Type type);
 void check_function_declaration(char* name);
+int check_function_call(char* name);
+int check_function_return(enum Type rettype);
 
 void binary_operation(Literal* op1, Literal* op2, Literal* res, fp_bin_op bin_op);
 
@@ -116,14 +119,15 @@ union Token {
 %token GOTO
 
 /* misc */
-%token LBRACKET LCURLY COMMA DELI RBRACKET RCURLY LPAR RPAR
-%token SIZEOF PRINTF SCANF
+%token LBRACKET LCURLY COMMA DELI RBRACKET RCURLY LPAR RPAR SIZEOF
+%token <str> PRINTF SCANF
 
 %left LT GT EQ NOTEQ
 %left AND OR
 %left PLUS MINUS
 %left STAR DIVISION MODULUS
 
+%nterm <str> fcaller
 %nterm <t> type_specifier
 %nterm <l> expr exprs
 %%
@@ -175,7 +179,7 @@ init_declarator:
 ;
 
 declarator_func:
-  type_specifier ID LPAR {
+  type_specifier ID { retvartype = $1; funcname = $2; } LPAR {
 	params_count = 0;
 	enter_scope();
   }
@@ -246,8 +250,8 @@ stmt:
 jump_stmt:
   CONTINUE DELI
 | BREAK DELI
-| RETURN DELI
-| RETURN expr DELI
+| RETURN DELI        { check_function_return(TYPE_VOID); }
+| RETURN expr DELI   { check_function_return($2.type);  }
 ;
 
 while_stmt:
@@ -268,7 +272,7 @@ assign_stmt:
 fcall_stmt:
 	fcall DELI
 ;
-func(4, 5)
+
 expr:
   LPAR expr RPAR            { $$ = $2 ; }
 | ID                        { check_var_declaration($1); var_to_expr($1, &$$); }
@@ -292,26 +296,24 @@ expr:
 | MINUS FLOATVAL            { $$ = $2; }
 | PLUS FLOATVAL             { $$ = $2; }
 | fcall                     {  }
-// int sum(int n1, int n2);
-// int a = sum(1, 2, "asdasd", variavel);
 | AMP ID                    { check_var_declaration($2); }
-| ID LBRACKET expr RBRACKET { check_var_declaration($1); }
+| ID LBRACKET expr RBRACKET { check_var_declaration($1); $$.type = vartype; } //TODO: improve this
 ;
 
 fcall:
-  fcaller LPAR RPAR         { fcall_active = 0; }
-| fcaller LPAR exprs RPAR   { fcall_active = 0; }
+  fcaller LPAR RPAR         { check_function_call($1); fcall_active = 0; }
+| fcaller LPAR exprs RPAR   { check_function_call($1); fcall_active = 0; }
 ;
 
 fcaller:
-  ID      { check_function_declaration($1); fcall_active = 1; }
-| PRINTF
-| SCANF
+  ID      { check_function_declaration($1); vector_clear(funcargs); fcall_active = 1; $$ = $1; }
+| PRINTF  { vector_clear(funcargs); fcall_active = 1; $$ = $1; }
+| SCANF   { vector_clear(funcargs); fcall_active = 1; $$ = $1; }
 ;
 
 exprs:
-  expr                  { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; $$ = $1 ; }
-| expr COMMA exprs      { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; $$ = $1 ; }
+  expr { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; }
+| expr { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; } COMMA exprs
 ;
 
 /* WARNING: o tipo void deverá ser tratado durante a analise semântica: NÂO permitir a declaração de variáveis desse tipo. */
@@ -389,6 +391,45 @@ void check_function_declaration(char* name){
 	if(missing_function_declared){
 		printf("SEMANTIC ERROR (%d): function %s hasn't been declared yet\n", yylineno, name);
 	}
+}
+
+int check_function_call(char* name){
+#define STRING_EQ(name1, name2) (strcmp(name1, name2) == 0)
+	if(STRING_EQ(name, "printf") || STRING_EQ(name, "scanf")){
+		return 0;
+	}
+#undef STRING_EQ
+	Function* f = func_table_search(functable, name);
+	Scope* scope = func_get_scope(f);
+	VarTable* vt = scope_get_vartable(scope);
+	const int nparams = func_get_nparams(f);
+	const int nargs = vector_get_size(funcargs);
+	Variable* param = NULL;
+	Literal* arg = NULL;
+	
+	if(nargs != nparams){
+		fprintf(stderr, "TYPE ERROR (%d); function %s called with insufficient number of arguments\n", yylineno, name);
+		return -1;
+	}
+
+	for(int i=0; i<nparams; i++){
+		param = vartable_idx(vt, i);
+		arg = vector_get_item(funcargs, i);
+		if(arg->type != param->token.type){
+			fprintf(stderr, "TYPE ERROR (%d); function %s called with argument of wrong type; '%s' should be '%s'\n", yylineno, name, literal_get_typename(arg), literal_get_typename(&param->token));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+int check_function_return(enum Type rettype){
+	if(retvartype != rettype){
+		fprintf(stderr, "TYPE ERROR (%d); function %s with wrong return type; '%s' should be '%s'\n", yylineno, funcname, type_get_name(rettype), type_get_name(retvartype));
+		return -1;
+	}
+	return 0;
 }
 
 void check_if_while_condition(Literal* exp){

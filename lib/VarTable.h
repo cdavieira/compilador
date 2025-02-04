@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Literal.h"
+#include <stddef.h>
 
 typedef struct VarTable VarTable;
 
@@ -13,6 +14,8 @@ int vartable_add(
 	enum Type type);
 
 Variable* vartable_search(VarTable* vt, const char* name);
+
+Variable* vartable_idx(VarTable* vt, size_t idx);
 
 void vartable_print(VarTable* vt);
 

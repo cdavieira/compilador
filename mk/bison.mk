@@ -8,7 +8,7 @@ BISON := bison
 BISONFLAGS := 
 
 # --header: generate a header file
-# BISONFLAGS += --header=$(bison_hdr)
+BISONFLAGS += --header=$(bison_hdr)
 
 # --no-lines: don't use the #line preprocessor macro in the c output file
 BISONFLAGS += --no-lines
@@ -23,9 +23,9 @@ BISONFLAGS += --token-table
 BISONFLAGS += --debug
 
 # -Wprecedence: enable warning related to precedence errors/no effect
-# BISONFLAGS += -Wprecedence
+BISONFLAGS += -Wprecedence
 
 # -Wcounterexamples: enable examples which explain the errors
-# BISONFLAGS += -Wcounterexamples
+BISONFLAGS += -Wcounterexamples
 
-# BISONFLAGS += -Wconflicts-sr
+BISONFLAGS += -Wconflicts-sr

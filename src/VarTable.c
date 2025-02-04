@@ -36,6 +36,10 @@ Variable* vartable_search(VarTable* vt, const char* s) {
 	return vector_search(vt->t, (void*) s, (int (*)(void*, void*)) variable_name_equals);
 }
 
+Variable* vartable_idx(VarTable* vt, size_t idx){
+	return vector_get_item(vt->t, idx);
+}
+
 void vartable_print(VarTable* vt){
 	printf("Variables table:\n");
 	Variable* var;

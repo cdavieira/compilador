@@ -9,9 +9,9 @@ typedef union Value {
 
 enum Type {
 	TYPE_VOID = 0,
-	TYPE_INT,
-	TYPE_FLT,
-	TYPE_CHAR,
+	TYPE_INT, //1
+	TYPE_FLT, //2
+	TYPE_CHAR, //3
 	TYPE_STR
 };
 

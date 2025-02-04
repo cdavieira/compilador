@@ -6,6 +6,7 @@ typedef struct Scope Scope;
 
 Scope* scope_new(int id, int parent, int level);
 Scope* scope_destroy(Scope* scope);
+void scope_print(Scope* scope);
 
 int scope_get_id(Scope* scope);
 int scope_get_parent(Scope* scope);

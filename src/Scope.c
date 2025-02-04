@@ -13,6 +13,7 @@ struct Scope {
 	int level; //the depth/level of how deep this scope is in a nested-scope context
 };
 
+
 Scope* scope_new(int id, int parent, int level){
 	Scope* scope = malloc(sizeof(Scope));
 	scope->vartable = vartable_new();
@@ -26,6 +27,10 @@ Scope* scope_destroy(Scope* scope){
 	vartable_destroy(scope->vartable);
 	free(scope);
 	return NULL;
+}
+
+void scope_print(Scope* scope){
+
 }
 
 int scope_get_id(Scope* scope){
