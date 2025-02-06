@@ -11,4 +11,8 @@ separado e checar se ha algum conflito de nomes
 * [ ] change this msg: "SEMANTIC ERROR (24): conditional expression in IF/REPEAT is 'char' instead of 'int'"
 * [ ] investigar caso de teste 'tests/typesystem/if.c' (retorno da linha errado)
 
-# DONE
+```
+# https://prod.liveshare.vsengsaas.visualstudio.com/join?DC4B2EC1E737E7890C947087E9D9D0A6A1B8
+nc -l -p 5555
+nc 10.0.8.3 8080
+```

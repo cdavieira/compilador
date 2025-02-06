@@ -1,6 +1,6 @@
 #include "Literal.h"
 
-#include "stdio.h"
+#include <stdio.h>
 #include <string.h>
 
 /**/
@@ -78,16 +78,39 @@ const char* literal_get_typename(const Literal* td){
 	return type_get_name(td->type);
 }
 
+static const char* operation_table_get_typename(enum BinaryOperationTable val){
+	switch(val){
+		case EE:
+			return "INVALID";
+		case OK:
+			return "VALID";
+		case II:
+			return "int int";
+		case FF:
+			return "float float";
+		case CC:
+			return "char char";
+		case FI:
+			return "float int";
+		case CI:
+			return "char int";
+		case CF:
+			return "char float";
+		case IF:
+			return "int float";
+		case IC:
+			return "int char";
+		case FC:
+			return "float char";
+	}
+	return "???";
+}
+
 
 
 /**/
 
-#define FUNCDEF(NAME, OPERATION) \
-int literal_ ## NAME ( \
-	Literal* op1, \
-	Literal* op2, \
-	Literal* res) \
-{ \
+#define FUNCDEF(OPERATION) \
 	switch(arith_table_lookup[op1->type][op2->type]){ \
 		case II: \
 			res->type = TYPE_INT; \
@@ -128,22 +151,48 @@ int literal_ ## NAME ( \
 		default: \
 			return -1; \
 	} \
-	return 0; \
+	return 0;
+
+#define PRINT_EXPR(l1, l2, op) \
+	printf("Expression type debug: %s %s %s = %s\n", \
+		literal_get_typename(l1), \
+		#op,\
+		literal_get_typename(l2), \
+		operation_table_get_typename(arith_table_lookup[op1->type][op2->type]));
+
+int literal_sum(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, +);
+#endif
+FUNCDEF(+)
 }
-FUNCDEF(sum, +)
-FUNCDEF(sub, -)
-FUNCDEF(mul, *)
-FUNCDEF(div, /)
+
+int literal_sub(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, -);
+#endif
+FUNCDEF(-)
+}
+
+int literal_mul(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, *);
+#endif
+FUNCDEF(*)
+}
+
+int literal_div(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, /);
+#endif
+FUNCDEF(/)
+}
+#undef PRINT_EXPR
 #undef FUNCDEF
 
 
-#define FUNCDEF(NAME, OPERATION) \
-int literal_ ## NAME ( \
-	Literal* op1, \
-	Literal* op2, \
-	Literal* res) \
-{ \
-	\
+
+#define FUNCDEF(OPERATION) \
 	switch(logical_table_lookup[op1->type][op2->type]){ \
 		case II: \
 		case IC: \
@@ -159,21 +208,70 @@ int literal_ ## NAME ( \
 		default: \
 			return -1; \
 	} \
-	return 0; \
+	return 0;
+
+#define PRINT_EXPR(l1, l2, op) \
+	printf("Expression type debug: %s %s %s = %s\n", \
+		literal_get_typename(l1), \
+		#op,\
+		literal_get_typename(l2), \
+		operation_table_get_typename(logical_table_lookup[op1->type][op2->type]));
+
+int literal_lt(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, <);
+#endif
+FUNCDEF(<)
 }
-FUNCDEF(lt, <)
-FUNCDEF(gt, >)
-FUNCDEF(eq, ==)
-FUNCDEF(and, &&)
-FUNCDEF(or, ||)
-FUNCDEF(ne, !=)
+
+int literal_gt(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, >);
+#endif
+FUNCDEF(>)
+}
+
+int literal_eq(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, =);
+#endif
+FUNCDEF(==)
+}
+
+int literal_and(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, &&);
+#endif
+FUNCDEF(&&)
+}
+
+int literal_or(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, ||);
+#endif
+FUNCDEF(||)
+}
+
+int literal_ne(Literal* op1, Literal* op2, Literal* res){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, !=);
+#endif
+FUNCDEF(!=)
+}
+#undef PRINT_EXPR
 #undef FUNCDEF
+
 
 
 int literal_assign (
 	Literal* op1,
 	Literal* res)
 {
+#ifdef DEBUG_EXPR_TYPE
+	printf("Expression type debug: %s = %s (%s)\n",
+		literal_get_typename(res), literal_get_typename(op1),
+		operation_table_get_typename(assign_table_lookup[res->type][op1->type]));
+#endif
 	switch(assign_table_lookup[res->type][op1->type]){
 		case II:
 			res->value.i = op1->value.i;

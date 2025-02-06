@@ -22,8 +22,14 @@ include mk/flex.mk
 include mk/bison.mk
 include mk/valgrind.mk
 
+# Add debug information for when the parser walks in/walks out of a scope
 # CFLAGS += -DDEBUG_SCOPE
+
+# Print all the scopes and functions detected by the parser
 # CFLAGS += -DDEBUG_PARSER
+
+# Add debug information about the resulting type of each expression 
+# CFLAGS += -DDEBUG_EXPR_TYPE
 
 obj:
 	mkdir $@

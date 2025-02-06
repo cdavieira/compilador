@@ -93,15 +93,15 @@ Scope* scope_manager_get_current_scope(ScopeManager* manager){
 }
 
 void scope_manager_exit(ScopeManager* manager){
+#ifdef DEBUG_SCOPE
 	//saving the id of the current scope as the old one
 	int old_scope = manager->current;
-
+#endif
 	//leaving the previous scope
 	int *v = stack_pop(manager->scope_tracker);
 	manager->current = *v;
 	int_destroy(v);
 	manager->depth--;
-
 #ifdef DEBUG_SCOPE
 	printf("Exiting scope (prev = %d, next = %d, depth = %d)\n", old_scope, manager->current, manager->depth);
 #endif
