@@ -104,6 +104,10 @@ Value get_val(VarTable* vt, int idx){
 	return vt->t[idx].literal.value;
 }
 
+Variable get_var(VarTable* vt, int idx){
+	return vt->t[idx];
+}
+
 void print_var_table(VarTable* vt) {
 	printf("Variables table:\n");
 	for (int i = 0; i < vt->size; i++) {

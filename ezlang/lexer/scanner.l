@@ -9,6 +9,7 @@
 #include <string.h>
 #include "vector.h"
 #include "parser.h"
+#include "Literal.h"
 #define CMD(NAME) return NAME;
 
 static Vector* ids;
@@ -21,7 +22,6 @@ void lexer_save_string(void);
 void lexer_save_id(void);
 void lexer_save_int(void);
 void lexer_save_float(void);
-void lexer_save_operator(enum OperatorType v);
 %}
 
 comentario      \{[^}]*\}
@@ -54,13 +54,13 @@ ignore          {comentario}|\n
 "repeat"        { CMD(REPEAT) }
 "until"         { CMD(UNTIL)  }
 "end"           { CMD(END)    }
-":="            { lexer_save_operator(OPERATOR_ASSIGN); CMD(ASSIGN) }
-"="             { lexer_save_operator(OPERATOR_EQ);     CMD(EQ) }
-"<"             { lexer_save_operator(OPERATOR_LT);     CMD(LT) }
-"*"             { lexer_save_operator(OPERATOR_MUL);    CMD(TIMES) }
-"+"             { lexer_save_operator(OPERATOR_SUM);    CMD(PLUS) }
-"/"             { lexer_save_operator(OPERATOR_DIV);    CMD(OVER) }
-"-"             { lexer_save_operator(OPERATOR_MINUS);  CMD(MINUS) }
+":="            { lexer_save_id(); CMD(ASSIGN) }
+"="             { lexer_save_id(); CMD(EQ) }
+"<"             { lexer_save_id(); CMD(LT) }
+"*"             { lexer_save_id(); CMD(TIMES) }
+"+"             { lexer_save_id(); CMD(PLUS) }
+"/"             { lexer_save_id(); CMD(OVER) }
+"-"             { lexer_save_id(); CMD(MINUS) }
 "("             { CMD(LPAR)   }
 ")"             { CMD(RPAR)   }
 {branco}        { }
@@ -116,8 +116,4 @@ void lexer_save_int(void){
 
 void lexer_save_float(void){
 	literal_str_to_flt(&yylval.l, yytext);
-}
-
-void lexer_save_operator(enum OperatorType type){
-	operator_str(&yylval.o, yytext, type);
 }

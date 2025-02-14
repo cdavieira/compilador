@@ -63,6 +63,8 @@ enum Type get_type(VarTable* vt, int i);
 
 int get_scope_level(VarTable* vt, int i);
 
+Variable get_var(VarTable* vt, int idx);
+
 Value get_val(VarTable* vt, int i);
 
 void set_val(VarTable* vt, int i, Value val);

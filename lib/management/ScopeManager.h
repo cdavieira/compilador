@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Scope.h"
+#include "type/Scope.h"
 
 typedef struct ScopeManager ScopeManager;
 

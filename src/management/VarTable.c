@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "VarTable.h"
-#include "Literal.h"
-#include "Vector.h"
+#include "management/VarTable.h"
+#include "type/Literal.h"
+#include "container/Vector.h"
 
 struct VarTable {
 	Vector* t;

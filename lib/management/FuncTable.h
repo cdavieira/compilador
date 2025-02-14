@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Function.h"
+#include "type/Function.h"
 
 /* FuncTable */
 typedef struct FuncTable FuncTable;

@@ -1,0 +1,9 @@
+program addone;
+var
+int x;
+int xxxx;
+begin
+  read x;
+  x := x + 1;
+  write x;
+end

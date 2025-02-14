@@ -1,7 +1,7 @@
-#include "ScopeManager.h"
-#include "Scope.h"
-#include "Vector.h"
-#include "Stack.h"
+#include "management/ScopeManager.h"
+#include "type/Scope.h"
+#include "container/Vector.h"
+#include "container/Stack.h"
 
 #include <stdio.h>
 #include <malloc.h>
