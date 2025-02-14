@@ -57,7 +57,7 @@ typedef struct AST AST;
 AST* ast_new_node(NodeKind kind);
 void ast_free(AST *ast);
 /* calling convention: last parameter should be NULL! */
-AST* ast_new_subtree(NodeKind kind,  ...);
+AST* ast_new_subtree(NodeKind kind, ...);
 
 AST* ast_get_child(AST *parent, int idx);
 NodeKind ast_get_kind(AST *node);

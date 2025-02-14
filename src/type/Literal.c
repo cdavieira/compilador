@@ -1,52 +1,48 @@
 #include "type/Literal.h"
 
-const char* literal_get_typename(const Literal* td){
-	return type_name(td->type);
-}
-
 #define FUNCDEF(OPERATION) \
 	switch(binoptable_get_arithtype(op1->type, op2->type)){ \
-		case II: \
+		case BINOP_II: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break; \
-		case IC: \
+		case BINOP_IC: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_C2I; \
 			break; \
-		case IF: \
+		case BINOP_IF: \
 			res->type = TYPE_FLT; \
 			res->left = CONV_I2F; \
 			res->right = CONV_NONE; \
 			break; \
-		case FF: \
+		case BINOP_FF: \
 			res->type = TYPE_FLT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break; \
-		case FI: \
+		case BINOP_FI: \
 			res->type = TYPE_FLT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_I2F; \
 			break; \
-		case FC: \
+		case BINOP_FC: \
 			res->type = TYPE_FLT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_C2F; \
 			break; \
-		case CC: \
+		case BINOP_CC: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break; \
-		case CI: \
+		case BINOP_CI: \
 			res->type = TYPE_INT; \
 			res->left = CONV_C2I; \
 			res->right = CONV_NONE; \
 			break; \
-		case CF: \
+		case BINOP_CF: \
 			res->type = TYPE_FLT; \
 			res->left = CONV_C2F; \
 			res->right = CONV_NONE; \
@@ -58,9 +54,9 @@ const char* literal_get_typename(const Literal* td){
 
 #define PRINT_EXPR(l1, l2, op) \
 	printf("Expression type debug: %s %s %s = %s\n", \
-		literal_get_typename(l1), \
+		type_name(l1->type), \
 		#op,\
-		literal_get_typename(l2), \
+		type_name(l2->type), \
 		operation_table_get_typename(binoptable_get_arithtype(op1->type, op2->type)));
 
 int literal_sum(Literal* op1, Literal* op2, BinaryOperationData* res){
@@ -97,47 +93,47 @@ FUNCDEF(/)
 
 #define FUNCDEF(OPERATION) \
 	switch(binoptable_get_logicaltype(op1->type, op2->type)){ \
-		case II: \
+		case BINOP_II: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break ; \
-		case IC: \
+		case BINOP_IC: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_C2I; \
 			break ; \
-		case IF: \
+		case BINOP_IF: \
 			res->type = TYPE_INT; \
 			res->left = CONV_I2F; \
 			res->right = CONV_NONE; \
 			break ; \
-		case FF: \
+		case BINOP_FF: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break ; \
-		case FI: \
+		case BINOP_FI: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_I2F; \
 			break ; \
-		case FC: \
+		case BINOP_FC: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_C2F; \
 			break ; \
-		case CC: \
+		case BINOP_CC: \
 			res->type = TYPE_INT; \
 			res->left = CONV_NONE; \
 			res->right = CONV_NONE; \
 			break ; \
-		case CI: \
+		case BINOP_CI: \
 			res->type = TYPE_INT; \
 			res->left = CONV_C2I; \
 			res->right = CONV_NONE; \
 			break ; \
-		case CF: \
+		case BINOP_CF: \
 			res->type = TYPE_INT; \
 			res->left = CONV_C2F; \
 			res->right = CONV_NONE; \
@@ -149,9 +145,9 @@ FUNCDEF(/)
 
 #define PRINT_EXPR(l1, l2, op) \
 	printf("Expression type debug: %s %s %s = %s\n", \
-		literal_get_typename(l1), \
+		type_name(l1->type), \
 		#op,\
-		literal_get_typename(l2), \
+		type_name(l2->type), \
 		operation_table_get_typename(binoptable_get_logicaltype(op1->type, op2->type)));
 
 int literal_lt(Literal* op1, Literal* op2, BinaryOperationData* res){
@@ -206,51 +202,51 @@ int literal_assign (
 {
 #ifdef DEBUG_EXPR_TYPE
 	printf("Expression type debug: %s = %s (%s)\n",
-		literal_get_typename(res), literal_get_typename(op1),
+		type_name(res), type_name(op1->type->type),
 		operation_table_get_typename(binoptable_get_assigntype(op1->type, res->type)));
 #endif
 	switch(binoptable_get_assigntype(op1->type, res->type)){
-		case II:
+		case BINOP_II:
 			res->type = TYPE_INT;
 			res->right = CONV_NONE;
 			// res->value.i = op1->value.i;
 			break;
-		case IC:
+		case BINOP_IC:
 			res->type = TYPE_INT;
 			res->right = CONV_C2I;
 			// res->value.i = op1->value.c;
 			break;
-		case IF:
+		case BINOP_IF:
 			res->type = TYPE_INT;
 			res->right = CONV_F2I;
 			// res->value.f = ((float)op1->value.f);
 			break;
-		case FF:
+		case BINOP_FF:
 			res->type = TYPE_FLT;
 			res->right = CONV_NONE;
 			// res->value.f = op1->value.f;
 			break;
-		case FI:
+		case BINOP_FI:
 			res->type = TYPE_FLT;
 			res->right = CONV_I2F;
 			// res->value.f = ((float)op1->value.i);
 			break;
-		case FC:
+		case BINOP_FC:
 			res->type = TYPE_FLT;
 			res->right = CONV_C2F;
 			// res->value.f = ((float)op1->value.c);
 			break;
-		case CC:
+		case BINOP_CC:
 			res->type = TYPE_INT;
 			res->right = CONV_NONE;
 			// res->value.c = op1->value.c;
 			break;
-		case CI:
+		case BINOP_CI:
 			res->type = TYPE_CHAR;
 			res->right = CONV_I2C;
 			// res->value.c = op1->value.i;
 			break;
-		case CF:
+		case BINOP_CF:
 			res->type = TYPE_CHAR;
 			res->right = CONV_F2C;
 			// res->value.c = ((char)op1->value.f);

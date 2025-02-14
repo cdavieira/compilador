@@ -20,7 +20,7 @@ struct AST {
 AST* ast_new_node(NodeKind kind) {
 	AST* node = malloc(sizeof(struct AST));
 	node->kind = kind;
-	node->data = (union NodeData) {.nil = NULL};
+	node->has_data = 0;
 	node->children = vector_new(8);
 	return node;
 }
@@ -88,55 +88,54 @@ enum Type ast_get_type(AST *node){
 
 void ast_set_data(AST* node, NodeData data){
 	switch(node->kind){
-		case VAR_USE_NODE:
-		case VAR_DECL_NODE:
-			node->type = data.var.literal.type;
+		case NODE_VAR_USE:
+		case NODE_VAR_DECL:
+			node->type = data.var.token.type;
 			node->data = data;
+			node->has_data = 1;
 			break;
-		case READ_NODE:
-		case WRITE_NODE:
+		case NODE_ASSIGN:
+		case NODE_CHR_VAL:
+		case NODE_EQ:
+		case NODE_FLT_VAL:
+		case NODE_INT_VAL:
+		case NODE_LT:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_SCANF:
+		case NODE_FUNC_DECL:
+		case NODE_FUNC_USE:
+		case NODE_STR_VAL:
+		case NODE_TIMES:
+		case NODE_PRINTF:
 			node->type = data.lit.type;
 			node->data = data;
+			node->has_data = 1;
 			break;
-		case BOOL_VAL_NODE:
-		case INT_VAL_NODE:
-		case REAL_VAL_NODE:
-		case STR_VAL_NODE:
-			node->type = data.lit.type;
-			node->data = data;
-			break;
-		case PROGRAM_NODE:
-		case BLOCK_NODE:
-		case IF_NODE:
-		case VAR_LIST_NODE:
-			node->type = TYPE_NOTHING;
-			node->data = data;
-			break;
-		case LT_NODE:
-		case MINUS_NODE:
-		case OVER_NODE:
-		case PLUS_NODE:
-		case ASSIGN_NODE:
-		case EQ_NODE:
-		case REPEAT_NODE:
-		case TIMES_NODE:
-			node->type = data.lit.type;
-			node->data = data;
-			break;
-		case B2I_NODE:
+		case NODE_C2I:
+		case NODE_F2I:
 			node->type = TYPE_INT;
+			node->has_data = 0;
 			break;
-		case B2R_NODE:
-		case I2R_NODE:
+		case NODE_I2F:
+		case NODE_C2F:
 			node->type = TYPE_FLT;
+			node->has_data = 0;
 			break;
-		case B2S_NODE:
-		case I2S_NODE:
-		case R2S_NODE:
-			node->type = TYPE_STR;
+		case NODE_F2C:
+		case NODE_I2C:
+			node->type = TYPE_CHAR;
+			node->has_data = 0;
 			break;
-		default:
-			node->type = TYPE_NOTHING;
+		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_PROGRAM:
+		case NODE_VAR_LIST:
+		case NODE_WHILE:
+			node->type = TYPE_VOID;
+			node->has_data = 0;
+		case NODE_NOCONV:
 			break;
 	}
 }
@@ -147,78 +146,165 @@ void ast_add_child(AST *parent, AST *child) {
 
 char* ast_kind2str(NodeKind kind) {
 	switch(kind) {
-		case ASSIGN_NODE:   return ":=";
-		case EQ_NODE:       return "=";
-		case BLOCK_NODE:    return "block";
-		case BOOL_VAL_NODE: return "";
-		case IF_NODE:       return "if";
-		case INT_VAL_NODE:  return "";
-		case LT_NODE:       return "<";
-		case MINUS_NODE:    return "-";
-		case OVER_NODE:     return "/";
-		case PLUS_NODE:     return "+";
-		case PROGRAM_NODE:  return "program";
-		case READ_NODE:     return "read";
-		case REAL_VAL_NODE: return "";
-		case REPEAT_NODE:   return "repeat";
-		case STR_VAL_NODE:  return "";
-		case TIMES_NODE:    return "*";
-		case VAR_DECL_NODE: return "var_decl";
-		case VAR_LIST_NODE: return "var_list";
-		case VAR_USE_NODE:  return "var_use";
-		case WRITE_NODE:    return "write";
-		case B2I_NODE:      return "B2I";
-		case B2R_NODE:      return "B2R";
-		case B2S_NODE:      return "B2S";
-		case I2R_NODE:      return "I2R";
-		case I2S_NODE:      return "I2S";
-		case R2S_NODE:      return "R2S";
-		default:            return "ERROR!!";
+		case NODE_PROGRAM:      return "program"; 
+		case NODE_DECLARATORS:  return "declarators"; 
+		case NODE_BLOCK:        return "block";
+		case NODE_IF:           return "if"; 
+		case NODE_VAR_LIST:     return "var_list";
+		case NODE_VAR_USE:      return "var_use"; 
+		case NODE_VAR_DECL:     return "var_decl"; 
+		case NODE_INT_VAL:      return "int_val"; 
+		case NODE_FLT_VAL:      return "flt_val"; 
+		case NODE_CHR_VAL:      return "chr_val"; 
+		case NODE_STR_VAL:      return "str_val"; 
+		case NODE_MINUS:        return "minus";
+		case NODE_OVER:         return "over";
+		case NODE_PLUS:         return "plus";
+		case NODE_TIMES:        return "times";
+		case NODE_LT:           return "lt"; 
+		case NODE_GT:           return "gt"; 
+		case NODE_EQ:           return "eq"; 
+		case NODE_NE:           return "ne"; 
+		case NODE_OR:           return "or"; 
+		case NODE_AND:          return "and";
+		case NODE_ASSIGN:       return "assign"; 
+		case NODE_WHILE:        return "while";
+		case NODE_SCANF:        return "scanf";
+		case NODE_PRINTF:       return "printf";
+		case NODE_FUNC_DECL:    return "funcdecl";
+		case NODE_FUNC_USE:     return "funcuse";
+		case NODE_ARRAY_VAL:    return "array";
+		case NODE_I2F:          return "i2f";
+		case NODE_I2C:          return "i2c";
+		case NODE_C2I:          return "c2i";
+		case NODE_C2F:          return "c2f";
+		case NODE_F2I:          return "f2i";
+		case NODE_F2C:          return "f2c";
+		case NODE_NOCONV:       return "noconv";
 	}
+	return "ERROR!!";
 }
 
 int ast_has_literal(AST* node) {
 	switch(node->kind) {
-		case BOOL_VAL_NODE:
-		case INT_VAL_NODE:
-		case REAL_VAL_NODE:
-		case STR_VAL_NODE:
+		case NODE_ASSIGN:
+		case NODE_CHR_VAL:
+		case NODE_EQ:
+		case NODE_FLT_VAL:
+		case NODE_INT_VAL:
+		case NODE_LT:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_SCANF:
+		case NODE_FUNC_DECL:
+		case NODE_FUNC_USE:
+		case NODE_STR_VAL:
+		case NODE_TIMES:
+		case NODE_PRINTF:
 		    return 1;
-		default:
-		    return 0;
+		case NODE_VAR_USE:
+		case NODE_VAR_DECL:
+		case NODE_C2I:
+		case NODE_F2I:
+		case NODE_I2F:
+		case NODE_C2F:
+		case NODE_F2C:
+		case NODE_I2C:
+		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_PROGRAM:
+		case NODE_VAR_LIST:
+		case NODE_WHILE:
+		case NODE_NOCONV:
+		case NODE_DECLARATORS:
 	}
+	return 0;
 }
 
 int ast_has_var(AST* node) {
 	switch(node->kind) {
-		case VAR_DECL_NODE:
-		case VAR_USE_NODE:
+		case NODE_VAR_DECL:
+		case NODE_VAR_USE:
 		    return 1;
-		default:
-		    return 0;
+		case NODE_PROGRAM:
+		case NODE_DECLARATORS:
+		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_VAR_LIST:
+		case NODE_INT_VAL:
+		case NODE_FLT_VAL:
+		case NODE_CHR_VAL:
+		case NODE_STR_VAL:
+		case NODE_ARRAY_VAL:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_TIMES:
+		case NODE_LT:
+		case NODE_GT:
+		case NODE_EQ:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
+		case NODE_ASSIGN:
+		case NODE_WHILE:
+		case NODE_SCANF:
+		case NODE_PRINTF:
+		case NODE_FUNC_DECL:
+		case NODE_FUNC_USE:
+		case NODE_I2F:
+		case NODE_I2C:
+		case NODE_C2I:
+		case NODE_C2F:
+		case NODE_F2I:
+		case NODE_F2C:
+		case NODE_NOCONV:
 	}
+	return 0;
 }
 
 Literal* ast_get_literal(AST* node){
 	switch(node->kind){
-		case BOOL_VAL_NODE:
-		case INT_VAL_NODE:
-		case REAL_VAL_NODE:
-		case STR_VAL_NODE:
-		case LT_NODE:
-		case MINUS_NODE:
-		case OVER_NODE:
-		case PLUS_NODE:
-		case ASSIGN_NODE:
-		case EQ_NODE:
-		case TIMES_NODE:
+		case NODE_ASSIGN:
+		case NODE_CHR_VAL:
+		case NODE_EQ:
+		case NODE_FLT_VAL:
+		case NODE_INT_VAL:
+		case NODE_LT:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_SCANF:
+		case NODE_FUNC_DECL:
+		case NODE_FUNC_USE:
+		case NODE_STR_VAL:
+		case NODE_TIMES:
+		case NODE_PRINTF:
 			return &node->data.lit;
-		case VAR_DECL_NODE:
-		case VAR_USE_NODE:
-			return &node->data.var.literal;
-		default:
-			return NULL;
+		case NODE_VAR_DECL:
+		case NODE_VAR_USE:
+			return &node->data.var.token;
+		case NODE_PROGRAM:
+		case NODE_DECLARATORS:
+		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_VAR_LIST:
+		case NODE_ARRAY_VAL:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
+		case NODE_WHILE:
+		case NODE_I2F:
+		case NODE_I2C:
+		case NODE_C2I:
+		case NODE_C2F:
+		case NODE_F2I:
+		case NODE_F2C:
+		case NODE_NOCONV:
 	}
+	return NULL;
 }
 
 
@@ -240,14 +326,6 @@ void print_dot(AST *tree, VarTable* vt) {
 }
 
 static int print_node_dot(AST *node, VarTable* vt) {
-	// if(node == NULL){
-	//   puts("Deu ruim");
-	//   return -1;
-	// }
-	// if(vt == NULL){
-	//   puts("Deu ruim dnv");
-	//   return -1;
-	// }
 	int my_nr = nr++;
 	NodeKind kind = node->kind;
 	NodeData data = node->data;
@@ -258,10 +336,10 @@ static int print_node_dot(AST *node, VarTable* vt) {
 	//beginning of label
 	fprintf(stderr, "node%d[label=\"", my_nr);
 
-	if(type != TYPE_NOTHING) {
+	if(type != TYPE_VOID) {
 		fprintf(stderr, "(%s) ", typename);
 	}
-	if(kind == VAR_DECL_NODE || kind == VAR_USE_NODE) {
+	if(kind == NODE_VAR_DECL || kind == NODE_VAR_USE) {
 		fprintf(stderr, "%s@", data.var.name);
 	}
 	else{
@@ -269,10 +347,10 @@ static int print_node_dot(AST *node, VarTable* vt) {
 	}
 
 	if(ast_has_literal(node)) {
-		if(node->kind == REAL_VAL_NODE) {
+		if(node->kind == NODE_FLT_VAL) {
 			fprintf(stderr, "%.2f", data.lit.value.f);
 		}
-		else if(node->kind == STR_VAL_NODE) {
+		else if(node->kind == NODE_STR_VAL) {
 			fprintf(stderr, "@%s", data.lit.value.s);
 		}
 		else{

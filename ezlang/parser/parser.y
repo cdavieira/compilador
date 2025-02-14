@@ -73,7 +73,8 @@ union TokenData {
 program: PROGRAM ID SEMI vars_sect stmt_sect {
 		NodeData data;
 		data.nil = NULL;
-		root = ast_new_node(PROGRAM_NODE, data);
+		root = ast_new_node(PROGRAM_NODE);
+		ast_set_data(root, data);
 		if($4 != NULL){
 			ast_add_child(root, $4);
 		}
@@ -101,7 +102,8 @@ var_decl_list:
 		if(decl_list_created == 0){
 			NodeData data;
 			data.nil = NULL;
-			$$ = ast_new_node(VAR_LIST_NODE, data);
+			$$ = ast_new_node(VAR_LIST_NODE);
+			ast_set_data($$, data);
 			decl_list_created = 1;
 		}
 		ast_add_child($$, $2);
@@ -110,7 +112,8 @@ var_decl_list:
 		if(decl_list_created == 0){
 			NodeData data;
 			data.nil = NULL;
-			$$ = ast_new_node(VAR_LIST_NODE, data);
+			$$ = ast_new_node(VAR_LIST_NODE);
+			ast_set_data($$, data);
 			decl_list_created = 1;
 		}
 		ast_add_child($$, $1);
@@ -142,7 +145,8 @@ stmt_list:
 		if(stmt_list_created == 0){
 			NodeData data;
 			data.nil = NULL;
-			$$ = ast_new_node(BLOCK_NODE, data);
+			$$ = ast_new_node(BLOCK_NODE);
+			ast_set_data($$, data);
 			stmt_list_created = 1;
 		}
 		if($2 != NULL){
@@ -156,7 +160,8 @@ stmt_list:
 		if(stmt_list_created == 0){
 			NodeData data;
 			data.nil = NULL;
-			$$ = ast_new_node(BLOCK_NODE, data);
+			$$ = ast_new_node(BLOCK_NODE);
+			ast_set_data($$, data);
 			stmt_list_created = 1;
 		}
 		if($1 != NULL){
@@ -205,12 +210,14 @@ assign_stmt:
 
 			NodeData data;
 			data.lit = *lit;
-			$$ = ast_new_node(ASSIGN_NODE, data);
+			$$ = ast_new_node(ASSIGN_NODE);
+			ast_set_data($$, data);
 
 			Variable var;
 			parser_get_var($1, &var);
 			data.var = var;
-			AST* ass = ast_new_node(VAR_USE_NODE, data);
+			AST* ass = ast_new_node(VAR_USE_NODE);
+			ast_set_data(ass, data);
 			ast_add_child($$, ass);
 			ast_add_child($$, $3);
 	    }
@@ -226,7 +233,8 @@ read_stmt:
 		parser_get_var($2, &var);
 		NodeData data;
 		data.lit = var.literal;
-		$$ = ast_new_node(READ_NODE, data);
+		$$ = ast_new_node(READ_NODE);
+		ast_set_data($$, data);
 
 		AST* varread = NULL;
 		load_var_to_token($2, &varread);
@@ -240,7 +248,8 @@ write_stmt:
 		if(lit != NULL){
 			NodeData data;
 			data.lit = *lit;
-			$$ = ast_new_node(WRITE_NODE, data);
+			$$ = ast_new_node(WRITE_NODE);
+			ast_set_data($$, data);
 			ast_add_child($$, $2);
 		}
 		else{
@@ -272,11 +281,11 @@ expr:
 |	expr TIMES expr  { binary_operation($1, $3, &$$, literal_mult, $2, TIMES_NODE); }
 |	expr OVER expr   { binary_operation($1, $3, &$$, literal_div, $2, OVER_NODE); }
 |	LPAR expr RPAR   { $$ = $2; }
-|	TRUE             { NodeData data; data.lit = $1; $$ = ast_new_node(BOOL_VAL_NODE, data); }
-|	FALSE            { NodeData data; data.lit = $1; $$ = ast_new_node(BOOL_VAL_NODE, data); }
-|	INT_VAL          { NodeData data; data.lit = $1; $$ = ast_new_node(INT_VAL_NODE, data); }
-|	FLOAT_VAL        { NodeData data; data.lit = $1; $$ = ast_new_node(REAL_VAL_NODE, data); }
-|	STRING_VAL       { NodeData data; data.lit = $1; $$ = ast_new_node(STR_VAL_NODE, data); }
+|	TRUE             { NodeData data; data.lit = $1; $$ = ast_new_node(BOOL_VAL_NODE); ast_set_data($$, data); }
+|	FALSE            { NodeData data; data.lit = $1; $$ = ast_new_node(BOOL_VAL_NODE); ast_set_data($$, data); }
+|	INT_VAL          { NodeData data; data.lit = $1; $$ = ast_new_node(INT_VAL_NODE);  ast_set_data($$, data); }
+|	FLOAT_VAL        { NodeData data; data.lit = $1; $$ = ast_new_node(REAL_VAL_NODE); ast_set_data($$, data); }
+|	STRING_VAL       { NodeData data; data.lit = $1; $$ = ast_new_node(STR_VAL_NODE);  ast_set_data($$, data); }
 |	ID               { load_var_to_token($1, &$$); }
 ;
 %%
@@ -453,7 +462,8 @@ void binary_operation(
 			kind = NOCONV_NODE;
 	}
 	if(kind != NOCONV_NODE){
-		leftnode = ast_new_subtree(kind, ast_get_data(op1), op1, NULL);
+		leftnode = ast_new_subtree(kind, op1, NULL);
+		ast_set_data(leftnode, ast_get_data(op1));
 	}
 
 	switch(meta.right){
@@ -479,12 +489,14 @@ void binary_operation(
 			kind = NOCONV_NODE;
 	}
 	if(kind != NOCONV_NODE){
-		rightnode = ast_new_subtree(kind, ast_get_data(op2), op2, NULL);
+		rightnode = ast_new_subtree(kind, op2, NULL);
+		ast_set_data(rightnode, ast_get_data(op2));
 	}
 
 	NodeData resdata;
 	resdata.lit.type = meta.type;
-	*res = ast_new_subtree(nodekind, resdata, leftnode, rightnode, NULL);
+	*res = ast_new_subtree(nodekind, leftnode, rightnode, NULL);
+	ast_set_data(*res, resdata);
 }
 
 void save_token_to_var(Literal* props, char* varname){
@@ -527,7 +539,8 @@ void load_var_to_token(char* varname, AST** res){
 	int idx = lookup_var(table, varname, scope_get_level(scope));
 	Variable var = get_var(table, idx);
 	NodeData data = {.var = var};
-	*res = ast_new_node(VAR_USE_NODE, data);
+	*res = ast_new_node(VAR_USE_NODE);
+	ast_set_data(*res, data);
 }
 
 void parser_get_var(char* varname, Variable* res){

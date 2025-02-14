@@ -8,6 +8,7 @@
 struct AST {
 	NodeKind kind;
 	Type type;
+	unsigned has_data;
 	NodeData data;
 	Vector* children;
 };
@@ -16,19 +17,20 @@ struct AST {
 
 /* instantiation/destruction */
 
-AST* ast_new_node(NodeKind kind, NodeData data) {
+AST* ast_new_node(NodeKind kind) {
 	AST* node = malloc(sizeof(struct AST));
 	node->kind = kind;
-	ast_set_data(node, data);
+	node->type = TYPE_NOTHING;
+	node->has_data = 0;
 	node->children = vector_new(8);
 	return node;
 }
 
-AST* ast_new_subtree(NodeKind kind, NodeData data, ...) {
+AST* ast_new_subtree(NodeKind kind, ...) {
 	va_list va;
-	va_start(va, data);
+	va_start(va, kind);
 
-	AST* node = ast_new_node(kind, data);
+	AST* node = ast_new_node(kind);
 
 	for(AST* subnode = va_arg(va, void*);
 	    subnode != NULL;
@@ -91,36 +93,25 @@ void ast_set_data(AST* node, NodeData data){
 		case VAR_DECL_NODE:
 			node->type = data.var.literal.type;
 			node->data = data;
+			node->has_data= 1;
 			break;
-		case READ_NODE:
-		case WRITE_NODE:
-			node->type = data.lit.type;
-			node->data = data;
-			break;
+		case ASSIGN_NODE:
 		case BOOL_VAL_NODE:
+		case EQ_NODE:
 		case INT_VAL_NODE:
-		case REAL_VAL_NODE:
-		case STR_VAL_NODE:
-			node->type = data.lit.type;
-			node->data = data;
-			break;
-		case PROGRAM_NODE:
-		case BLOCK_NODE:
-		case IF_NODE:
-		case VAR_LIST_NODE:
-			node->type = TYPE_NOTHING;
-			node->data = data;
-			break;
 		case LT_NODE:
 		case MINUS_NODE:
 		case OVER_NODE:
 		case PLUS_NODE:
-		case ASSIGN_NODE:
-		case EQ_NODE:
+		case READ_NODE:
+		case REAL_VAL_NODE:
 		case REPEAT_NODE:
+		case STR_VAL_NODE:
 		case TIMES_NODE:
+		case WRITE_NODE:
 			node->type = data.lit.type;
 			node->data = data;
+			node->has_data= 1;
 			break;
 		case B2I_NODE:
 			node->type = TYPE_INT;
@@ -134,8 +125,13 @@ void ast_set_data(AST* node, NodeData data){
 		case R2S_NODE:
 			node->type = TYPE_STR;
 			break;
+		case BLOCK_NODE:
+		case IF_NODE:
+		case PROGRAM_NODE:
+		case VAR_LIST_NODE:
 		default:
 			node->type = TYPE_NOTHING;
+			node->has_data = 0;
 			break;
 	}
 }

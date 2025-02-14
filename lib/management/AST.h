@@ -19,8 +19,10 @@ typedef enum {
 
 	/* types */
 	NODE_INT_VAL,
-	NODE_FLOAT_VAL,
+	NODE_FLT_VAL,
+	NODE_CHR_VAL,
 	NODE_STR_VAL,
+	NODE_ARRAY_VAL,
 
 	/* operators */
 	NODE_MINUS,
@@ -41,15 +43,17 @@ typedef enum {
 	/* functions */
 	NODE_SCANF,
 	NODE_PRINTF,
+	NODE_FUNC_DECL,
+	NODE_FUNC_USE,
 
 	/* conversions */
-	NODE_B2I,
-	NODE_B2R,
-	NODE_B2S,
-	NODE_I2R,
-	NODE_I2S,
-	NODE_R2S,
-	NOCONV_NODE
+	NODE_I2F,
+	NODE_I2C,
+	NODE_C2I,
+	NODE_C2F,
+	NODE_F2I,
+	NODE_F2C,
+	NODE_NOCONV,
 } NodeKind;
 
 typedef union NodeData {
@@ -61,10 +65,10 @@ typedef union NodeData {
 
 typedef struct AST AST;
 
-AST* ast_new_node(NodeKind kind, NodeData data);
+AST* ast_new_node(NodeKind kind);
 void ast_free(AST *ast);
 /* calling convention: last parameter should be NULL! */
-AST* ast_new_subtree(NodeKind kind, NodeData data, ...);
+AST* ast_new_subtree(NodeKind kind, ...);
 
 AST* ast_get_child(AST *parent, int idx);
 NodeKind ast_get_kind(AST *node);

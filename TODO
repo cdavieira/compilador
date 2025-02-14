@@ -11,7 +11,9 @@ separado e checar se ha algum conflito de nomes
 * [ ] change this msg: "SEMANTIC ERROR (24): conditional expression in IF/REPEAT is 'char' instead of 'int'"
 * [ ] investigar caso de teste 'tests/typesystem/if.c' (retorno da linha errado)
 
-* [ ] CORRIGIR ezlang POS MUDANÇAS NA CHAMADA DO 'ast_new_node'
+* [ ] fazer 'fcaller' (ast)
+* [ ] fazer 'array' (ast)
+* [ ] fazer 'funcoes' (ast)
 
 ```
 nc -l -p 5555

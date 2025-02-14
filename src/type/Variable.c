@@ -1,4 +1,6 @@
 #include "type/Variable.h"
+#include <stdio.h>
+#include <string.h>
 
 int variable_name_equals(Variable* var, const char* name){
 	return strcmp(var->name, name) == 0;

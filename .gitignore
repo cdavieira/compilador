@@ -1,2 +1,11 @@
 .cache/
 compile_commands.json
+lexer.yy.c
+parser.tab.c
+lexer.yy.h
+parser.tab.h
+*.dot
+*.pdf
+specs.txt
+TODO
+Session.vim

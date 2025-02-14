@@ -71,7 +71,7 @@ void func_table_print(FuncTable* table){
 
 		printf("Function '%s'\n", funcname);
 		printf("number of params: %d\n", num_params);
-		printf("return type: '%s'\n", type_get_name(ret));
+		printf("return type: '%s'\n", type_name(ret));
 		printf("Scope: id=%d, parent=%d\n", scope_id, scope_parent);
 		vartable_print(vt);
 

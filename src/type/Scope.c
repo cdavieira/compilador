@@ -1,6 +1,6 @@
 #include "type/Literal.h"
+#include "type/Scope.h"
 #include "management/VarTable.h"
-#include "management/Scope.h"
 
 #include <stdio.h>
 #include <malloc.h>

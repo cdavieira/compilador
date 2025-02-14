@@ -8,7 +8,6 @@ typedef struct Literal {
 	Value value;
 } Literal;
 
-const char* literal_get_typename(const Literal* td);
 int literal_sum(Literal* op1, Literal* op2, BinaryOperationData* res);
 int literal_sub(Literal* op1, Literal* op2, BinaryOperationData* res);
 int literal_mul(Literal* op1, Literal* op2, BinaryOperationData* res);

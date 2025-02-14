@@ -23,7 +23,7 @@ static const enum BinaryOperationTable assign_table_lookup[][4] = {
 };
 
 
-const char* type_get_name(enum Type type){
+const char* type_name(enum Type type){
 	switch(type){
 		case TYPE_INT:
 			return "int";

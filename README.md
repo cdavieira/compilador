@@ -25,6 +25,7 @@ Recursos fora do escopo desse parser:
 * union
 * pointer
 * for
+* operador modulo (%)
 
 
 Dicionário de termos usados no arquivo de configuração do bison (`parser/parser.y`)

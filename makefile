@@ -6,8 +6,9 @@ lexername := mylexer
 lfile := $(srcdir)/lexer/lexer.l
 yfile := $(srcdir)/parser/parser.y
 
-src := $(wildcard $(srcdir)/src/*.c)
-lib := $(wildcard $(srcdir)/lib/*.h)
+lookupdirs := container management type
+src := $(foreach d,$(lookupdirs),$(wildcard $(srcdir)/src/$(d)/*.c))
+lib := $(foreach d,$(lookupdirs),$(wildcard $(srcdir)/lib/$(d)/*.h))
 
 testcase := tests
 
@@ -15,7 +16,7 @@ testcase := tests
 
 .PHONY: test $(parsername) $(lexername)
 
-all: prologue $(parsername) $(lexername)
+all: prologue clean $(parsername) $(lexername)
 
 include mk/cc.mk
 include mk/flex.mk
@@ -69,6 +70,7 @@ clean:
 	@rm -f $(bison_files)
 
 echo:
+	@echo "src: $(src)"
 	@echo "flex file: $(lfile)"
 	@echo "flex files: $(flex_files)"
 	@echo "flex flags: $(FLEXFLAGS)"

@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "type/Literal.h"
-#include "container/Vector.h"
+#include "Literal.h"
+#include "vector.h"
 
 static Vector* strings;
 
