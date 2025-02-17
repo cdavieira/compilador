@@ -50,6 +50,10 @@ FuncTable* functable;
 Vector* funcargs;
 
 AST* root;
+int block_defined;
+int declarator_list_defined;
+int paramlist_defined;
+int arglist_defined;
 
 
 /* bison mandatory */
@@ -59,6 +63,7 @@ void yyerror(char const *s);
 /* internals */
 void parser_init(void);
 void parser_deinit(void);
+void parser_ast(char* name, int lineno);
 void parser_info(void);
 
 /* scope */
@@ -66,7 +71,7 @@ void scope_enter(void);
 void scope_exit(void);
 
 /* variables */
-void var_add_declaration(char* name, enum Type type);
+void var_add_declaration(char* name, enum Type type, AST** node);
 int var_check_declaration(char* name);
 // searchs a variable named 'name' in the current scope
 Variable* var_search(char* name);
@@ -81,6 +86,7 @@ int function_check_call(char* name);
 int function_check_return(enum Type rettype);
 void function_start_fcall();
 void function_end_fcall();
+void function_add_arg(AST* arg);
 
 /* misc */
 void binary_operation(
@@ -93,9 +99,13 @@ void binary_operation(
 void check_if_while_condition(AST* exp);
 
 /* ast related */
+void ast_manager_add_param(AST** params, AST* param, int* paramlist_defined);
+void ast_manager_add_block_item(AST** blocklist, AST* block, int* block_defined);
+void ast_manager_add_declarator_list(AST** declarator_list, AST* declarator, int* declarator_list_defined);
 void ast_manager_add_declarator(AST** declarators, AST* declarator);
 AST* ast_manager_new_node_literal(NodeKind kind, Literal lit);
 AST* ast_manager_new_node_id(char* name);
+AST* ast_manager_new_node_vardecl(Variable var);
 AST* ast_manager_new_node_function(NodeKind kind, char* name, enum Type type);
 AST* ast_manager_new_node_fcall(char* name);
 
@@ -232,13 +242,15 @@ union Token {
 %nterm <ast> declarators
 %nterm <ast> declarator_var
 %nterm <ast> declarator_func
+%nterm <ast> declarator_func_end
 %nterm <ast> type_specifier
 %nterm <ast> init_declarator
 %nterm <ast> init_declarator_list
 %nterm <ast> opt_func_paramlist
 %nterm <ast> func_param
 %nterm <ast> func_paramlist
-%nterm <ast> func_block stmt
+%nterm <ast> func_block
+%nterm <ast> stmt
 %nterm <ast> block_item
 %nterm <ast> block_item_list
 %nterm <ast> block
@@ -256,7 +268,8 @@ union Token {
 %left LT GT EQ NOTEQ
 %left AND OR
 %left PLUS MINUS
-%left STAR DIVISION MODULUS
+%left STAR DIVISION
+//%left MODULUS
 %%
 
 program:
@@ -274,21 +287,21 @@ declarator:
 ;
 
 declarator_var:
-  type_specifier init_declarator_list DELI
+  type_specifier init_declarator_list DELI { declarator_list_defined = 0; $$ = $2; }
 ;
 
 init_declarator_list:
-  init_declarator
-| init_declarator COMMA init_declarator_list
+  init_declarator                            { ast_manager_add_declarator_list(&$$, $1, &declarator_list_defined); }
+| init_declarator COMMA init_declarator_list { ast_manager_add_declarator_list(&$$, $1, &declarator_list_defined); }
 ;
 
 init_declarator:
-  ID                                                        { var_add_declaration($1, vartype); }
-| ID ASSIGN expr                                            { var_add_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET                               { var_add_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { var_add_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { var_add_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { var_add_declaration($1, TYPE_STR); }
+  ID                                                        { var_add_declaration($1, vartype, &$$); }
+| ID ASSIGN expr                                            { var_add_declaration($1, vartype, &$$); }
+| ID LBRACKET INTVAL RBRACKET                               { var_add_declaration($1, vartype, &$$); }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { var_add_declaration($1, vartype, &$$); }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { var_add_declaration($1, vartype, &$$); }
+| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { var_add_declaration($1, TYPE_STR,&$$); }
 ;
 
 declarator_func:
@@ -297,83 +310,90 @@ declarator_func:
 	funcname = $2;
   } LPAR {
 	params_count = 0;
+	paramlist_defined = 0;
 	scope_enter();
   }
   opt_func_paramlist RPAR declarator_func_end {
 	if(function_add_declaration($2, retvartype) == -1){
 		exit(1);
 	}
+	$$ = ast_new_node(NODE_FUNC_DECL);
+	NodeData data;
+	data.lit = (Literal){.type = retvartype};
+	ast_set_data($$, data);
+
+	ast_add_child($$, $6);
+	ast_add_child($$, $8);
 	scope_exit();
   }
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
 declarator_func_end:
-  DELI        { function_definition = 0; }
-| func_block  { function_definition = 1; }
+  DELI        { function_definition = 0; $$ = NULL; }
+| func_block  { function_definition = 1; $$ = $1; }
 ;
 
 opt_func_paramlist:
-  %empty
-| func_paramlist
+  %empty         { $$ = NULL; }
+| func_paramlist { $$ = $1; }
 ;
 
 func_paramlist:
-  func_param    { params_count++; }
-| func_param    { params_count++; } COMMA func_paramlist
+  func_param { params_count++; ast_manager_add_param(&$$, $1, &paramlist_defined); }
+| func_param { params_count++; } COMMA func_paramlist { ast_manager_add_param(&$$, $1, &paramlist_defined); }
 ;
 
 func_param:
-  type_specifier
-| type_specifier ID                                       { var_add_declaration($2, vartype); }
-| type_specifier ID LBRACKET RBRACKET                     { var_add_declaration($2, vartype); }
-| type_specifier ID LBRACKET expr RBRACKET                { var_add_declaration($2, vartype); }
-| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    /* int (*)(...) */
-| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR /* int (*varname)(...) */
+  type_specifier ID                                       { var_add_declaration($2, vartype, &$$); }
+| type_specifier ID LBRACKET RBRACKET                     { var_add_declaration($2, vartype, &$$); }
+| type_specifier ID LBRACKET expr RBRACKET                { var_add_declaration($2, vartype, &$$); }
+| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; }/* int (*)(...) */
+| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR { $$ = NULL; }/* int (*varname)(...) */
 ;
 
 /* foi necessario criar um bloco que sirva como ponto de entrada de funções e
  * que não crie um novo escopo para a função (isso já é feito ao criar o escopo
  * da lista de argumentos) */
 func_block:
-  LCURLY RCURLY
+  LCURLY RCURLY { $$ = NULL; }
 | LCURLY {
 	function_definition = 0;
 	if(function_add_declaration(funcname, retvartype) == -1){
 		fprintf(stdout, "Err when adding temporary func declaration\n");
 	}
 	function_definition = 1;
-  } block_item_list RCURLY
+  } block_item_list RCURLY { $$ = $3; }
 
 block:
-  LCURLY RCURLY
-| LCURLY { scope_enter(); } block_item_list RCURLY { scope_exit(); }
+  LCURLY RCURLY { $$ = NULL; }
+| LCURLY { scope_enter(); block_defined = 0; } block_item_list RCURLY { scope_exit(); $$ = $3; }
 ;
 
 block_item_list:
-  block_item
-| block_item_list block_item
+  block_item                  { ast_manager_add_block_item(&$$, $1, &block_defined); }
+| block_item_list block_item  { ast_manager_add_block_item(&$$, $2, &block_defined); }
 ;
 
 block_item:
-  declarator_var
-| stmt
-| block
+  declarator_var { $$ = $1; }
+| stmt           { $$ = $1; }
+| block          { $$ = $1; }
 ;
 
 stmt:
-  assign_stmt
-| if_stmt
-| while_stmt
-| jump_stmt
-| fcall_stmt
+  assign_stmt { $$ = NULL; }
+| if_stmt     { $$ = NULL; }
+| while_stmt  { $$ = NULL; }
+| jump_stmt   { $$ = NULL; }
+| fcall_stmt  { $$ = NULL; }
 ;
 
 jump_stmt:
-  CONTINUE DELI
-| BREAK DELI
+  CONTINUE DELI      { $$ = NULL; }
+| BREAK DELI         { $$ = NULL; }
 | RETURN DELI        { function_check_return(TYPE_VOID); }
-| RETURN expr DELI   { function_check_return(ast_get_type($2));  }
+| RETURN expr DELI   { function_check_return(ast_get_type($2)); $$ = $2; }
 ;
 
 while_stmt:
@@ -396,7 +416,7 @@ fcall_stmt:
 ;
 
 expr:
-  ID                        { ast_manager_new_node_id($1); }
+  ID                        { $$ = ast_manager_new_node_id($1); }
 | number                    { $$ = $1; }
 | STRING                    { $$ = ast_manager_new_node_literal(NODE_STR_VAL, $1);; }
 | CHR                       { $$ = ast_manager_new_node_literal(NODE_CHR_VAL, $1);; }
@@ -412,8 +432,7 @@ expr:
 | expr LT expr              { binary_operation($1, $3, &$$, NODE_LT, literal_lt);  }
 | expr GT expr              { binary_operation($1, $3, &$$, NODE_GT, literal_gt);  }
 | fcall                     { $$ = $1; }
-| AMP ID                    { var_check_declaration($2); }
-| ID LBRACKET expr RBRACKET { var_check_declaration($1); } //TODO: improve this
+| ID LBRACKET expr RBRACKET { var_check_declaration($1); $$ = NULL; } //TODO: improve this
 ;
 
 number:
@@ -424,8 +443,8 @@ number:
 ;
 
 fcall:
-  fcaller LPAR RPAR         { function_check_call($1); function_end_fcall(); }
-| fcaller LPAR exprs RPAR   { function_check_call($1); function_end_fcall(); }
+  fcaller LPAR RPAR         { if(function_check_call($1) == -1){ exit(1); }; function_end_fcall(); }
+| fcaller LPAR exprs RPAR   { if(function_check_call($1) == -1){ exit(1); }; function_end_fcall(); }
 ;
 
 fcaller:
@@ -435,11 +454,10 @@ fcaller:
 ;
 
 exprs:
-  expr { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; }
-| expr { if(fcall_active == 1){ vector_append(funcargs, &$1) ; }; } COMMA exprs
+  expr { function_add_arg($1); }
+| expr { function_add_arg($1); } COMMA exprs
 ;
 
-/* WARNING: o tipo void deverá ser tratado durante a analise semântica: NÂO permitir a declaração de variáveis desse tipo. */
 type_specifier:
   INT     { vartype = TYPE_INT;  }
 | CHAR    { vartype = TYPE_CHAR; }
@@ -461,6 +479,8 @@ void parser_deinit(void){
 	scope_manager_destroy(&scope_manager);
 	func_table_destroy(&functable);
 	vector_destroy(&funcargs, NULL);
+	ast_free(root);
+	root = NULL;
 }
 
 void parser_info(void){
@@ -468,6 +488,20 @@ void parser_info(void){
 	scope_manager_print(scope_manager);
 	func_table_print(functable);
 #endif
+#ifdef DEBUG_AST
+	ast_print(root);
+#endif
+}
+
+void parser_ast(char* name, int lineno){
+	Variable var = (Variable){.name = name, .line = lineno};
+	Scope* scope = scope_manager_search(scope_manager, &var);
+	if(scope == NULL){
+		fprintf(stdout, "parser_ast: %s(%d) not found\n", name, lineno);
+		return ;
+	}
+	VarTable* vt = scope_get_vartable(scope);
+	print_dot(root, vt);
 }
 
 
@@ -485,21 +519,25 @@ void scope_exit(void){
 
 /* variables */
 
-void var_add_declaration(char* name, enum Type type){
+void var_add_declaration(char* name, enum Type type, AST** node){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
 	if(scope_add(scope, name, yylineno, type) == -1){
 		Variable* var = scope_search_by_name(scope, name);
 		printf("SEMANTIC ERROR (%d): variable %s has been declared already\n", var->line, name);
 		exit(1);
 	}
+
+	Variable* var = scope_search_by_name(scope, name);
+
 	if(type == TYPE_VOID){
-		Variable* var = scope_search_by_name(scope, name);
 		printf("SEMANTIC ERROR (%d): variable %s has been declared with type VOID\n", var->line, name);
 		exit(1);
 	}
 #ifdef DEBUG_SCOPE
 	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
 #endif
+
+	*node = ast_manager_new_node_vardecl(*var);
 }
 
 int var_check_declaration(char* name){
@@ -619,6 +657,12 @@ void function_end_fcall(){
 	fcall_active = 0;
 }
 
+void function_add_arg(AST* arg){
+	if(fcall_active == 1){
+		vector_append(funcargs, arg);
+	}
+}
+
 
 
 /* misc */
@@ -660,7 +704,7 @@ void binary_operation(
 	if(l1 == NULL || l2 == NULL){
 		*res = NULL;
 		fprintf(stdout, "Got nil when performing operation (NODEKIND=%d)\n", nodekind);
-		return ;
+		exit(1);
 	}
 
 	if(operation(l1, l2, &meta) == -1){
@@ -759,6 +803,34 @@ void binary_operation(
 
 /* ast related */
 
+void ast_manager_add_param(AST** params, AST* param, int* paramlist_defined){
+	if(*paramlist_defined == 0){
+		*params = ast_new_node(NODE_FUNC_PARAMLIST);
+		*paramlist_defined = 1;
+	}
+	if(param != NULL){
+		ast_add_child(*params, param); 
+	}
+}
+
+void ast_manager_add_block_item(AST** block, AST* item, int* block_defined){
+	if(*block_defined == 0){
+		*block = ast_new_node(NODE_BLOCK);
+		*block_defined = 1;
+	}
+	if(item != NULL){
+		ast_add_child(*block, item); 
+	}
+}
+
+void ast_manager_add_declarator_list(AST** declarator_list, AST* declarator, int* declarator_list_defined){
+	if(*declarator_list_defined == 0){
+		*declarator_list = ast_new_node(NODE_VAR_LIST);
+		*declarator_list_defined = 1;
+	}
+	ast_add_child(*declarator_list, declarator); 
+}
+
 void ast_manager_add_declarator(AST** declarators, AST* declarator){
 	static int declarators_defined = 0;
 	if(declarators_defined == 0){
@@ -806,6 +878,14 @@ AST* ast_manager_new_node_fcall(char* name){
 	AST* node = ast_new_node(NODE_FUNC_USE);
 	NodeData data;
 	data.lit = (Literal) {.type = function_get_returntype(name) };
+	ast_set_data(node, data);
+	return node;
+}
+
+AST* ast_manager_new_node_vardecl(Variable var){
+	AST* node = ast_new_node(NODE_VAR_DECL);
+	NodeData data;
+	data.var = var;
 	ast_set_data(node, data);
 	return node;
 }

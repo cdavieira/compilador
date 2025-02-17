@@ -116,3 +116,5 @@ enum BinaryOperationTable
 binoptable_get_assigntype(
     enum Type op1,
     enum Type res);
+
+const char* operation_table_get_typename(enum BinaryOperationTable val);

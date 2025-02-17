@@ -17,9 +17,9 @@ int main(void) {
 	lexer_init();
 	parser_init();
 
-  if(yyparse() != 0){
-    return -1;
-  }
+	if(yyparse() != 0){
+		return -1;
+	}
 
 	parser_info();
 

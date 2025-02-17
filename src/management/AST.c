@@ -109,6 +109,10 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
 			node->type = data.lit.type;
 			node->data = data;
 			node->has_data = 1;
@@ -133,6 +137,9 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_PROGRAM:
 		case NODE_VAR_LIST:
 		case NODE_WHILE:
+		case NODE_DECLARATORS:
+		case NODE_ARRAY_VAL:
+		case NODE_FUNC_PARAMLIST:
 			node->type = TYPE_VOID;
 			node->has_data = 0;
 		case NODE_NOCONV:
@@ -181,6 +188,7 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_F2I:          return "f2i";
 		case NODE_F2C:          return "f2c";
 		case NODE_NOCONV:       return "noconv";
+		case NODE_FUNC_PARAMLIST: return "paramlist";
 	}
 	return "ERROR!!";
 }
@@ -202,6 +210,10 @@ int ast_has_literal(AST* node) {
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
 		    return 1;
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
@@ -218,6 +230,9 @@ int ast_has_literal(AST* node) {
 		case NODE_WHILE:
 		case NODE_NOCONV:
 		case NODE_DECLARATORS:
+		case NODE_ARRAY_VAL:
+		case NODE_FUNC_PARAMLIST:
+			break;
 	}
 	return 0;
 }
@@ -260,6 +275,8 @@ int ast_has_var(AST* node) {
 		case NODE_F2I:
 		case NODE_F2C:
 		case NODE_NOCONV:
+		case NODE_FUNC_PARAMLIST:
+			break;
 	}
 	return 0;
 }
@@ -303,18 +320,46 @@ Literal* ast_get_literal(AST* node){
 		case NODE_F2I:
 		case NODE_F2C:
 		case NODE_NOCONV:
+		case NODE_FUNC_PARAMLIST:
+			break;
 	}
 	return NULL;
 }
 
 
+int ast_id;
+static void ast_print_rec(AST* ast, int parent);
+void ast_print(AST* ast){
+	ast_print_rec(ast, -1);
+	ast_id = 0;
+}
+static void ast_print_rec(AST* ast, int parent){
+	if(ast_id > 30){
+	  return ;
+	}
+	const char* nodename = ast_kind2str(ast->kind);
+	const char* typename = type_name(ast->type);
+	const size_t child_count = vector_get_size(ast->children);
+	void* child;
+	int ast_id_copy = ast_id++;
+	printf("===BEGIN %d (%d)===\n", ast_id_copy, parent);
+	printf("nodekind: %s\n", nodename);
+	printf("type: %s\n", typename);
+	printf("has data: %d\n", ast->has_data);
+	printf("child count: %lu\n", child_count);
+	for(size_t i=0; i<child_count; i++){
+		child = vector_get_item(ast->children, i);
+		if(child == NULL){
+			printf("W: child %lu is NULL\n", i);
+			continue;
+		}
+		ast_print_rec(child, ast_id_copy);
+	}
+	printf("===END %d===\n", ast_id_copy);
+}
+
 
 // Dot output.
-
-void print_tree(AST *ast){
-	printf("KIND: %s\n", ast_kind2str(ast->kind));
-	printf("TYPE: %s\n", type_name(ast->type));
-}
 
 int nr;
 static int print_node_dot(AST *node, VarTable* vt);

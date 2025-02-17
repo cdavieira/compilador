@@ -22,8 +22,10 @@ static int* int_new(int value);
 static void int_destroy(int* value);
 static void scope_manager_print_recursive(
 		ScopeManager* manager, Scope* scope);
-static int scope_manager_search_recursive(
+static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name);
+static int scope_manager_search_recursive(
+	ScopeManager* manager, Scope* scope, Variable* search);
 
 ScopeManager* scope_manager_new(void){
 	ScopeManager* manager = malloc(sizeof(ScopeManager));
@@ -109,7 +111,17 @@ void scope_manager_exit(ScopeManager* manager){
 
 Scope* scope_manager_search_by_name(ScopeManager* manager, const char* varname){
 	Scope* scope = scope_manager_get_current_scope(manager);
-	int idx = scope_manager_search_recursive(manager, scope, varname);
+	int idx = scope_manager_search_by_name_recursive(manager, scope, varname);
+	if(idx == -1){
+		return NULL;
+	}
+	scope = vector_get_item(manager->scopes, idx);
+	return scope;
+}
+
+Scope* scope_manager_search(ScopeManager* manager, Variable* var){
+	Scope* scope = scope_manager_get_current_scope(manager);
+	int idx = scope_manager_search_recursive(manager, scope, var);
 	if(idx == -1){
 		return NULL;
 	}
@@ -118,6 +130,21 @@ Scope* scope_manager_search_by_name(ScopeManager* manager, const char* varname){
 }
 
 static int scope_manager_search_recursive(
+	ScopeManager* manager, Scope* scope, Variable* search)
+{
+	if(scope_search(scope, search) != NULL){
+		return scope_get_id(scope);
+	}
+
+	if(scope_get_parent(scope) == -1){
+		return -1;
+	}
+
+	Scope* parent = vector_get_item(manager->scopes, scope_get_parent(scope));
+	return scope_manager_search_recursive(manager, parent, search);
+}
+
+static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name)
 {
 	if(scope_search_by_name(scope, name) != NULL){
@@ -129,7 +156,7 @@ static int scope_manager_search_recursive(
 	}
 
 	Scope* parent = vector_get_item(manager->scopes, scope_get_parent(scope));
-	return scope_manager_search_recursive(manager, parent, name);
+	return scope_manager_search_by_name_recursive(manager, parent, name);
 }
 
 static int* int_new(int value){

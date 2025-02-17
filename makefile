@@ -29,6 +29,9 @@ include mk/valgrind.mk
 # Print all the scopes and functions detected by the parser
 # CFLAGS += -DDEBUG_PARSER
 
+# Print the abstract syntax tree
+CFLAGS += -DDEBUG_AST
+
 # Add debug information about the resulting type of each expression 
 # CFLAGS += -DDEBUG_EXPR_TYPE
 

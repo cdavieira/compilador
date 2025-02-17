@@ -15,3 +15,4 @@ VarTable* scope_get_vartable(Scope* scope);
 
 int scope_add(Scope* scope, char* name, int line, enum Type type);
 Variable* scope_search_by_name(Scope* scope, const char* name);
+Variable* scope_search(Scope* scope, Variable* search);

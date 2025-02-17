@@ -53,6 +53,10 @@ Variable* scope_search_by_name(Scope* scope, const char* name){
 	return vartable_search(scope->vartable, name);
 }
 
+Variable* scope_search(Scope* scope, Variable* search){
+	return vartable_sofisticated_search(scope->vartable, search);
+}
+
 int scope_add(Scope* scope, char* name, int line, enum Type type){
 	if(scope_search_by_name(scope, name) != NULL){
 		return -1;

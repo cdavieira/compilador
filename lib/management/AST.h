@@ -11,11 +11,11 @@ typedef enum {
 	NODE_DECLARATORS,
 	NODE_BLOCK,
 	NODE_IF,
-	NODE_VAR_LIST,
 
 	/* variables */
 	NODE_VAR_USE,
 	NODE_VAR_DECL,
+	NODE_VAR_LIST,
 
 	/* types */
 	NODE_INT_VAL,
@@ -45,6 +45,7 @@ typedef enum {
 	NODE_PRINTF,
 	NODE_FUNC_DECL,
 	NODE_FUNC_USE,
+	NODE_FUNC_PARAMLIST,
 
 	/* conversions */
 	NODE_I2F,
@@ -84,5 +85,5 @@ int ast_has_var(AST* node);
 Literal* ast_get_literal(AST* node);
 
 char* ast_kind2str(NodeKind kind);
-void print_tree(AST *ast);
 void print_dot(AST *ast, VarTable* vt);
+void ast_print(AST* ast);

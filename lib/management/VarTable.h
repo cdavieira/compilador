@@ -15,6 +15,8 @@ int vartable_add(
 
 Variable* vartable_search(VarTable* vt, const char* name);
 
+Variable* vartable_sofisticated_search(VarTable* vt, Variable* var);
+
 Variable* vartable_idx(VarTable* vt, size_t idx);
 
 void vartable_print(VarTable* vt);

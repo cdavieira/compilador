@@ -41,7 +41,7 @@ const char* type_name(enum Type type){
 
 
 
-static const char* operation_table_get_typename(enum BinaryOperationTable val){
+const char* operation_table_get_typename(enum BinaryOperationTable val){
 	switch(val){
 		case BINOP_EE:
 		              return "INVALID";

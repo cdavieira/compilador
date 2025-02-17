@@ -14,6 +14,9 @@ separado e checar se ha algum conflito de nomes
 * [ ] fazer 'fcaller' (ast)
 * [ ] fazer 'array' (ast)
 * [ ] fazer 'funcoes' (ast)
+* [ ] remover arquivos do git (TODO e unnecessary stufff)
+
+* [ ] melhorar sistema de testes para saber lidar com problemas que se espera encontrar problemas
 
 ```
 nc -l -p 5555
