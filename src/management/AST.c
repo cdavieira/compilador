@@ -362,15 +362,15 @@ static void ast_print_rec(AST* ast, int parent){
 // Dot output.
 
 int nr;
-static int print_node_dot(AST *node, VarTable* vt);
-void print_dot(AST *tree, VarTable* vt) {
+static int print_node_dot(AST *node);
+void print_dot(AST *tree) {
 	nr = 0;
 	fprintf(stderr, "digraph {\ngraph [ordering=\"out\"];\n");
-	print_node_dot(tree, vt);
+	print_node_dot(tree);
 	fprintf(stderr, "}\n");
 }
 
-static int print_node_dot(AST *node, VarTable* vt) {
+static int print_node_dot(AST *node) {
 	int my_nr = nr++;
 	NodeKind kind = node->kind;
 	NodeData data = node->data;
@@ -407,7 +407,7 @@ static int print_node_dot(AST *node, VarTable* vt) {
 	//end of label
 
 	for(int i = 0; i < count; i++) {
-		int child_nr = print_node_dot(ast_get_child(node, i), vt);
+		int child_nr = print_node_dot(ast_get_child(node, i));
 		fprintf(stderr, "node%d -> node%d;\n", my_nr, child_nr);
 	}
 

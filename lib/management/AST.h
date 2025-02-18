@@ -85,5 +85,5 @@ int ast_has_var(AST* node);
 Literal* ast_get_literal(AST* node);
 
 char* ast_kind2str(NodeKind kind);
-void print_dot(AST *ast, VarTable* vt);
+void print_dot(AST *ast);
 void ast_print(AST* ast);

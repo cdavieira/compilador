@@ -63,7 +63,6 @@ void yyerror(char const *s);
 /* internals */
 void parser_init(void);
 void parser_deinit(void);
-void parser_ast(char* name, int lineno);
 void parser_info(void);
 
 /* scope */
@@ -345,7 +344,8 @@ func_paramlist:
 ;
 
 func_param:
-  type_specifier ID                                       { var_add_declaration($2, vartype, &$$); }
+  type_specifier                                          { $$ = NULL; }
+| type_specifier ID                                       { var_add_declaration($2, vartype, &$$); }
 | type_specifier ID LBRACKET RBRACKET                     { var_add_declaration($2, vartype, &$$); }
 | type_specifier ID LBRACKET expr RBRACKET                { var_add_declaration($2, vartype, &$$); }
 | type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; }/* int (*)(...) */
@@ -489,19 +489,9 @@ void parser_info(void){
 	func_table_print(functable);
 #endif
 #ifdef DEBUG_AST
-	ast_print(root);
+	//ast_print(root);
+	//print_dot(root);
 #endif
-}
-
-void parser_ast(char* name, int lineno){
-	Variable var = (Variable){.name = name, .line = lineno};
-	Scope* scope = scope_manager_search(scope_manager, &var);
-	if(scope == NULL){
-		fprintf(stdout, "parser_ast: %s(%d) not found\n", name, lineno);
-		return ;
-	}
-	VarTable* vt = scope_get_vartable(scope);
-	print_dot(root, vt);
 }
 
 
