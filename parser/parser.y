@@ -20,6 +20,7 @@
 #include "FuncTable.h"
 #include "Literal.h"
 #include "Vector.h"
+#include "AST.h"
 
 typedef int (*fp_bin_op)(Literal*, Literal*, Literal*);
 
@@ -33,6 +34,7 @@ enum Type retvartype;
 ScopeManager* scope_manager;
 FuncTable* functable;
 Vector* funcargs;
+AST* root;
 
 int yylex(void);
 void yyerror(char const *s);
@@ -59,16 +61,21 @@ void binary_operation(Literal* op1, Literal* op2, Literal* res, fp_bin_op bin_op
 
 void check_if_while_condition(Literal* exp);
 void check_assignment(Literal* op1, Literal* res);
+
+void ast_manager_add_declarator(AST** declarators, AST* declarator);
+
 %}
 
 /* Make 'union Token' definition available in 'parser.tab.h'
  * REF: https://www.gnu.org/software/bison/manual/html_node/Prologue-Alternatives.html */
 %code requires {
 #include "Literal.h"
+#include "AST.h"
 union Token {
 	Literal l;
 	enum Type t;
 	char* str;
+	AST* ast;
 };
 }
 
@@ -130,6 +137,9 @@ union Token {
 %nterm <str> fcaller
 %nterm <t> type_specifier
 %nterm <l> expr exprs
+%nterm <ast> program
+%nterm <ast> declarator
+%nterm <ast> declarators
 %%
 
 /* Recursos fora do escopo desse parser:
@@ -147,17 +157,17 @@ union Token {
 */
 
 program:
-  declarators
+  declarators { root = ast_new_subtree(NODE_PROGRAM, $1, NULL); }
 ;
 
 declarators:
-  declarator
-| declarator declarators
+  declarator             { ast_manager_add_declarator(&$$, $1); }
+| declarator declarators { ast_manager_add_declarator(&$2, $1); $$ = $2; }
 ;
 
 declarator:
-  declarator_var
-| declarator_func
+  declarator_var  { $$ = ast_new_node(NODE_VAR_DECL);}
+| declarator_func { $$ = ast_new_node(NODE_FUNC_DECL);}
 ;
 
 declarator_var:
@@ -483,9 +493,19 @@ void parser_deinit(void){
 	vector_destroy(&funcargs, NULL);
 }
 
+void ast_manager_add_declarator(AST** declarators, AST* declarator){
+	static int declarators_defined = 0;
+	if(declarators_defined == 0){
+		*declarators = ast_new_node(NODE_DECLARATORS);
+		declarators_defined = 1;
+	}
+	ast_add_child(*declarators, declarator); 
+}
+
 void parser_info(void){
 #ifdef DEBUG_PARSER
 	scope_manager_print(scope_manager);
 	func_table_print(functable);
 #endif
+	print_dot(root);
 }
