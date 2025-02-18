@@ -21,7 +21,7 @@ int main(void) {
 		return -1;
 	}
 
-	parser_info();
+	/* parser_info(); */
 
 	parser_deinit();
 	lexer_deinit();

@@ -272,143 +272,117 @@ union Token {
 %%
 
 program:
-  declarators { printf("%p %p\n", $1, &$1); root = ast_new_subtree(NODE_PROGRAM, $1, NULL); }
+  declarators
 ;
 
 declarators:
-  declarator             { ast_manager_add_declarator(&$$, $1); printf("$$ (v=%p,a=%p) $1 (v=%p,a=%p)\n", $$, &$$, $1, &$1); }
-| declarator declarators { ast_manager_add_declarator(&$2, $1); $$ = $2; printf("$$ (v=%p,a=%p) $1 (%p,%p) $2 (%p,%p)\n", $$, &$$, $1, &$1, $2, &$2); }
+  declarator            
+| declarator declarators
 ;
 
 declarator:
-  declarator_var  { $$ = $1; }
-| declarator_func { $$ = $1; }
+  declarator_var 
+| declarator_func
 ;
 
 declarator_var:
-  type_specifier init_declarator_list DELI { declarator_list_defined = 0; $$ = $2; }
+  type_specifier init_declarator_list DELI
 ;
 
 init_declarator_list:
-  init_declarator                            { ast_manager_add_declarator_list(&$$, $1, &declarator_list_defined); }
-| init_declarator COMMA init_declarator_list { ast_manager_add_declarator_list(&$$, $1, &declarator_list_defined); }
+  init_declarator                           
+| init_declarator COMMA init_declarator_list
 ;
 
 init_declarator:
-  ID                                                        { var_add_declaration($1, vartype, &$$); }
-| ID ASSIGN expr                                            { var_add_declaration($1, vartype, &$$); }
-| ID LBRACKET INTVAL RBRACKET                               { var_add_declaration($1, vartype, &$$); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { var_add_declaration($1, vartype, &$$); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { var_add_declaration($1, vartype, &$$); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { var_add_declaration($1, TYPE_STR,&$$); }
+  ID                                                       
+| ID ASSIGN expr                                           
+| ID LBRACKET INTVAL RBRACKET                              
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY         
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY   
+| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                
 ;
 
 declarator_func:
-  type_specifier ID {
-	retvartype = vartype;
-	funcname = $2;
-  } LPAR {
-	params_count = 0;
-	paramlist_defined = 0;
-	scope_enter();
-  }
-  opt_func_paramlist RPAR declarator_func_end {
-	if(function_add_declaration(funcname, retvartype) == -1){
-		exit(1);
-	}
-	$$ = ast_new_node(NODE_FUNC_DECL);
-	NodeData data;
-	data.lit = (Literal){.type = retvartype};
-	ast_set_data($$, data);
-
-	ast_add_child($$, $6);
-	ast_add_child($$, $8);
-	scope_exit();
-  }
+  type_specifier ID  LPAR opt_func_paramlist RPAR declarator_func_end 
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
 declarator_func_end:
-  DELI        { function_definition = 0; $$ = NULL; }
-| func_block  { function_definition = 1; $$ = $1; }
+  DELI        
+| func_block 
 ;
 
 opt_func_paramlist:
-  %empty         { $$ = NULL; }
-| func_paramlist { $$ = $1; }
+  %empty         
+| func_paramlist
 ;
 
 func_paramlist:
-  func_param { params_count++; ast_manager_add_param(&$$, $1, &paramlist_defined); }
-| func_param { params_count++; } COMMA func_paramlist { ast_manager_add_param(&$$, $1, &paramlist_defined); }
+  func_param 
+| func_param COMMA func_paramlist 
 ;
 
 func_param:
-  type_specifier                                            { $$ = NULL; }
-| type_specifier ID                                         { var_add_declaration($2, vartype, &$$); }
-| type_specifier ID LBRACKET RBRACKET                       { var_add_declaration($2, vartype, &$$); }
-| type_specifier ID LBRACKET expr RBRACKET                  { var_add_declaration($2, vartype, &$$); }
-| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; }/* int (*)(...) */
-| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR { $$ = NULL; }/* int (*varname)(...) */
+  type_specifier                                            
+| type_specifier ID                                        
+| type_specifier ID LBRACKET RBRACKET                     
+| type_specifier ID LBRACKET expr RBRACKET               
+| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR /* int (*)(...) */
+| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR /* int (*varname)(...) */
 ;
 
 /* foi necessario criar um bloco que sirva como ponto de entrada de funções e
  * que não crie um novo escopo para a função (isso já é feito ao criar o escopo
  * da lista de argumentos) */
 func_block:
-  LCURLY RCURLY { $$ = NULL; }
-| LCURLY {
-	function_definition = 0;
-	if(function_add_declaration(funcname, retvartype) == -1){
-		fprintf(stdout, "Err when adding temporary func declaration\n");
-	}
-	function_definition = 1;
-  } block_item_list RCURLY { $$ = $3; }
+  LCURLY RCURLY 
+| LCURLY  block_item_list RCURLY 
 
 block:
-  LCURLY RCURLY { $$ = NULL; }
-| LCURLY { scope_enter(); block_defined = 0; } block_item_list RCURLY { scope_exit(); $$ = $3; }
+  LCURLY RCURLY 
+| LCURLY block_item_list RCURLY
 ;
 
 block_item_list:
-  block_item                  { ast_manager_add_block_item(&$$, $1, &block_defined); }
-| block_item_list block_item  { ast_manager_add_block_item(&$$, $2, &block_defined); }
+  block_item                 
+| block_item_list block_item  
 ;
 
 block_item:
-  declarator_var { $$ = $1; }
-| stmt           { $$ = $1; }
-| block          { $$ = $1; }
+  declarator_var 
+| stmt          
+| block        
 ;
 
 stmt:
-  assign_stmt { $$ = NULL; }
-| if_stmt     { $$ = NULL; }
-| while_stmt  { $$ = NULL; }
-| jump_stmt   { $$ = NULL; }
-| fcall_stmt  { $$ = NULL; }
+  assign_stmt 
+| if_stmt     
+| while_stmt  
+| jump_stmt   
+| fcall_stmt  
 ;
 
 jump_stmt:
-  CONTINUE DELI      { $$ = NULL; }
-| BREAK DELI         { $$ = NULL; }
-| RETURN DELI        { function_check_return(TYPE_VOID); }
-| RETURN expr DELI   { function_check_return(ast_get_type($2)); $$ = $2; }
+  CONTINUE DELI      
+| BREAK DELI         
+| RETURN DELI        
+| RETURN expr DELI   
 ;
 
 while_stmt:
-  WHILE LPAR expr RPAR block   { check_if_while_condition($3); }
+  WHILE LPAR expr RPAR block 
 ;
 
 if_stmt:
-  IF LPAR expr RPAR block              { check_if_while_condition($3); }
-| IF LPAR expr RPAR block ELSE block   { check_if_while_condition($3); }
-| IF LPAR expr RPAR block ELSE if_stmt { check_if_while_condition($3); }
+  IF LPAR expr RPAR block              
+| IF LPAR expr RPAR block ELSE block   
+| IF LPAR expr RPAR block ELSE if_stmt 
 ;
 
 assign_stmt:
-  ID ASSIGN expr DELI                          { var_check_declaration($1); }
-| ID LBRACKET expr RBRACKET ASSIGN expr DELI   { var_check_declaration($1); }
+  ID ASSIGN expr DELI                          
+| ID LBRACKET expr RBRACKET ASSIGN expr DELI  
 ;
 
 fcall_stmt:
@@ -416,53 +390,53 @@ fcall_stmt:
 ;
 
 expr:
-  ID                        { $$ = ast_manager_new_node_id($1); }
-| number                    { $$ = $1; }
-| STRING                    { $$ = ast_manager_new_node_literal(NODE_STR_VAL, $1);; }
-| CHR                       { $$ = ast_manager_new_node_literal(NODE_CHR_VAL, $1);; }
-| LPAR expr RPAR            { $$ = $2 ; }
-| expr PLUS expr            { binary_operation($1, $3, &$$, NODE_PLUS, literal_sum); }
-| expr MINUS expr           { binary_operation($1, $3, &$$, NODE_MINUS, literal_sub); }
-| expr STAR expr            { binary_operation($1, $3, &$$, NODE_TIMES, literal_mul); }
-| expr DIVISION expr        { binary_operation($1, $3, &$$, NODE_OVER, literal_div); }
-| expr OR expr              { binary_operation($1, $3, &$$, NODE_OR, literal_or);  }
-| expr AND expr             { binary_operation($1, $3, &$$, NODE_AND, literal_and); }
-| expr EQ expr              { binary_operation($1, $3, &$$, NODE_EQ, literal_eq);  }
-| expr NOTEQ expr           { binary_operation($1, $3, &$$, NODE_NE, literal_ne);  }
-| expr LT expr              { binary_operation($1, $3, &$$, NODE_LT, literal_lt);  }
-| expr GT expr              { binary_operation($1, $3, &$$, NODE_GT, literal_gt);  }
-| fcall                     { $$ = $1; }
-| ID LBRACKET expr RBRACKET { var_check_declaration($1); $$ = NULL; } //TODO: improve this
+  ID                        
+| number                    
+| STRING                    
+| CHR                       
+| LPAR expr RPAR            
+| expr PLUS expr            
+| expr MINUS expr           
+| expr STAR expr            
+| expr DIVISION expr        
+| expr OR expr              
+| expr AND expr             
+| expr EQ expr              
+| expr NOTEQ expr           
+| expr LT expr              
+| expr GT expr              
+| fcall                     
+| ID LBRACKET expr RBRACKET 
 ;
 
 number:
-  INTVAL                    { $$ = ast_manager_new_node_literal(NODE_INT_VAL, $1); }
-| FLOATVAL                  { $$ = ast_manager_new_node_literal(NODE_FLT_VAL, $1); }
-| MINUS number              { $$ = $2; }
-| PLUS number               { $$ = $2; }
+  INTVAL                   
+| FLOATVAL                 
+| MINUS number             
+| PLUS number              
 ;
 
 fcall:
-  fcaller LPAR RPAR         { if(function_check_call($1) == -1){ exit(1); }; function_end_fcall(); }
-| fcaller LPAR exprs RPAR   { if(function_check_call($1) == -1){ exit(1); }; function_end_fcall(); }
+  fcaller LPAR RPAR       
+| fcaller LPAR exprs RPAR 
 ;
 
 fcaller:
-  ID      { function_check_declaration($1); function_start_fcall(); }
-| PRINTF  { function_start_fcall(); }
-| SCANF   { function_start_fcall(); }
+  ID      
+| PRINTF  
+| SCANF   
 ;
 
 exprs:
-  expr { function_add_arg($1); }
-| expr { function_add_arg($1); } COMMA exprs
+  expr 
+| expr  COMMA exprs
 ;
 
 type_specifier:
-  INT     { vartype = TYPE_INT;  }
-| CHAR    { vartype = TYPE_CHAR; }
-| FLOAT   { vartype = TYPE_FLT;  }
-| VOID    { vartype = TYPE_VOID; }
+  INT  
+| CHAR
+| FLOAT
+| VOID
 ;
 
 %%
@@ -470,16 +444,16 @@ type_specifier:
 /* parser internals */
 
 void parser_init(void){
-	functable = func_table_new();
-	scope_manager = scope_manager_new();
-	funcargs = vector_new(12);
+	// functable = func_table_new();
+	// scope_manager = scope_manager_new();
+	// funcargs = vector_new(12);
 }
 
 void parser_deinit(void){
-	scope_manager_destroy(&scope_manager);
-	func_table_destroy(&functable);
-	vector_destroy(&funcargs, NULL);
-	ast_free(root);
+	// scope_manager_destroy(&scope_manager);
+	// func_table_destroy(&functable);
+	// vector_destroy(&funcargs, NULL);
+	// ast_free(root);
 	root = NULL;
 }
 

@@ -334,7 +334,7 @@ void ast_print(AST* ast){
 	ast_id = 0;
 }
 static void ast_print_rec(AST* ast, int parent){
-	if(ast_id > 30){
+	if(ast_id > 50){
 	  return ;
 	}
 	const char* nodename = ast_kind2str(ast->kind);
