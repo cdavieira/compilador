@@ -49,7 +49,7 @@ void vartable_print(VarTable* vt){
 		printf("Var %d -- ", i);
 		printf("name: %s, ", var->name);
 		printf("line: %d, ", var->line);
-		printf("type: %s\n", literal_get_typename(&var->token));
+		printf("type: %s\n", type_name(var->token.type));
 	}
 }
 

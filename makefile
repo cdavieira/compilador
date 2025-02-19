@@ -10,7 +10,7 @@ src := $(filter-out $(srcdir)/src/parser.c $(srcdir)/src/lexer.c,$(wildcard $(sr
 lib := $(wildcard $(srcdir)/lib/*.h)
 
 testcase := tests
-testfile := tests/cp5/teste1.c
+testfile := tests/OK/cp5/teste1.c
 
 ##############################################
 

@@ -351,7 +351,7 @@ void print_dot(AST *tree) {
 
 static void ast_print_rec(AST* ast, int parent){
 	const char* nodename = ast_kind2str(ast->kind);
-	const char* typename = type_get_name(ast->type);
+	const char* typename = type_name(ast->type);
 	const size_t child_count = vector_get_size(ast->children);
 	void* child;
 	printf("===BEGIN %d (%d)===\n", ast->id, parent);
@@ -374,7 +374,7 @@ static void print_node_dot(AST *node) {
 	NodeKind kind = node->kind;
 	NodeData data = node->data;
 	enum Type type = node->type;
-	const char* typename = type_get_name(type);
+	const char* typename = type_name(type);
 	const size_t count = ast_get_children_count(node);
 
 	//beginning of label
