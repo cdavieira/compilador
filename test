@@ -137,6 +137,9 @@ fi
 
 testing="$1"
 if test -f ${testing}; then
+	if [[ ${testing} =~ "FAIL" ]]; then
+		fails=1
+	fi
 	test_file ${executable} ${testing} ${fails} ${silent}
 else
 	test_dir ${executable} ${testing} ${fails} ${silent}
