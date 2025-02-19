@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "AST.h"
+#include "Function.h"
 #include "Literal.h"
 #include "Vector.h"
 #include "Scope.h"
@@ -100,6 +101,16 @@ enum Type ast_get_type(AST *node){
 
 void ast_set_data(AST* node, NodeData data){
 	switch(node->kind){
+		case NODE_FCALL:
+			node->type = func_get_return(data.func.func);
+			node->data = data;
+			node->has_data = 1;
+			break;
+		case NODE_ARRAY_VAL:
+			node->type = data.arr.var.token.type;
+			node->data = data;
+			node->has_data = 1;
+			break;
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
 			node->type = data.var.var.token.type;
@@ -149,7 +160,6 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_PROGRAM:
 		case NODE_VAR_LIST:
 		case NODE_WHILE:
-		case NODE_ARRAY_VAL:
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
 			node->type = TYPE_VOID;
@@ -192,6 +202,7 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_FUNC:         return "function";
 		case NODE_FUNC_USE:     return "funcuse";
 		case NODE_FUNC_BODY:    return "funcbody";
+		case NODE_FCALL:        return "fcall";
 		case NODE_ARRAY_VAL:    return "array";
 		case NODE_I2F:          return "i2f";
 		case NODE_I2C:          return "i2c";
@@ -244,6 +255,7 @@ int ast_has_literal(AST* node) {
 		case NODE_ARRAY_VAL:
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
+		case NODE_FCALL:
 			break;
 	}
 	return 0;
@@ -253,6 +265,7 @@ int ast_has_var(AST* node) {
 	switch(node->kind) {
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
+		case NODE_ARRAY_VAL:
 		    return 1;
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
@@ -262,7 +275,6 @@ int ast_has_var(AST* node) {
 		case NODE_FLT_VAL:
 		case NODE_CHR_VAL:
 		case NODE_STR_VAL:
-		case NODE_ARRAY_VAL:
 		case NODE_MINUS:
 		case NODE_OVER:
 		case NODE_PLUS:
@@ -288,6 +300,7 @@ int ast_has_var(AST* node) {
 		case NODE_NOCONV:
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
+		case NODE_FCALL:
 			break;
 	}
 	return 0;
@@ -313,12 +326,12 @@ Literal* ast_get_literal(AST* node){
 			return &node->data.lit;
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
-			return &node->data.var.var.token;
+		case NODE_ARRAY_VAL:
+			return &node->data.arr.var.token;
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
 		case NODE_IF:
 		case NODE_VAR_LIST:
-		case NODE_ARRAY_VAL:
 		case NODE_GT:
 		case NODE_NE:
 		case NODE_OR:
@@ -333,6 +346,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_NOCONV:
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
+		case NODE_FCALL:
 			break;
 	}
 	return NULL;
@@ -383,11 +397,16 @@ static void print_node_dot(AST *node) {
 	if(type != TYPE_VOID) {
 		fprintf(stderr, "(%s) ", typename);
 	}
+
 	if(kind == NODE_VAR_DECL || kind == NODE_VAR_USE) {
 		fprintf(stderr, "%s@%d", data.var.var.name, scope_get_id(data.var.scope));
 	}
 	else{
 		fprintf(stderr, "%s", ast_kind2str(kind));
+	}
+
+	if(kind == NODE_ARRAY_VAL){
+		fprintf(stderr, "#%lu", vector_get_size(node->children));
 	}
 
 	if(ast_has_literal(node)) {
@@ -397,7 +416,10 @@ static void print_node_dot(AST *node) {
 		else if(node->kind == NODE_STR_VAL) {
 			fprintf(stderr, "@%s", data.lit.value.s);
 		}
-		else{
+		else if(node->kind == NODE_CHR_VAL) {
+			fprintf(stderr, "%c", data.lit.value.c);
+		}
+		else if(node->kind == NODE_INT_VAL) {
 			fprintf(stderr, "%d", data.lit.value.i);
 		}
 	}

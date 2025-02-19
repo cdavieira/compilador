@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdarg.h>
+#include "Function.h"
 #include "Literal.h"
 #include "VarTable.h"
 #include "Scope.h"
@@ -9,7 +10,6 @@ typedef enum {
 	/* lang */
 	NODE_PROGRAM,
 	NODE_BLOCK,
-	NODE_IF,
 
 	/* variables */
 	NODE_VAR_USE,
@@ -38,6 +38,7 @@ typedef enum {
 
 	/* lang constructs */
 	NODE_WHILE,
+	NODE_IF,
 
 	/* functions */
 	NODE_SCANF,
@@ -46,6 +47,7 @@ typedef enum {
 	NODE_FUNC_PARAMLIST,
 	NODE_FUNC_BODY,
 	NODE_FUNC_USE,
+	NODE_FCALL,
 
 	/* conversions */
 	NODE_I2F,
@@ -62,6 +64,13 @@ typedef union NodeData {
 		Scope* scope;
 		Variable var;
 	} var;
+	struct {
+		Function* func;
+	} func;
+	struct {
+		Variable var;
+		int sz;
+	} arr;
 	Literal lit;
 	char* str;
 	void* nil;
