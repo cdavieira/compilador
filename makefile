@@ -1,12 +1,12 @@
-export srcdir := .
+srcdir := .
 
 parsername := myparser
 lexername := mylexer
 
-lfile := $(srcdir)/lexer/lexer.l
-yfile := $(srcdir)/parser/parser.y
+lfile := $(srcdir)/src/lexer.l
+yfile := $(srcdir)/src/parser.y
 
-src := $(wildcard $(srcdir)/src/*.c)
+src := $(filter-out $(srcdir)/src/parser.c $(srcdir)/src/lexer.c,$(wildcard $(srcdir)/src/*.c))
 lib := $(wildcard $(srcdir)/lib/*.h)
 
 testcase := tests
@@ -16,21 +16,56 @@ testfile := tests/cp5/teste1.c
 
 .PHONY: test $(parsername) $(lexername)
 
-all: prologue $(parsername) $(lexername)
+.SUFFIXES:
 
-include mk/cc.mk
-include mk/flex.mk
-include mk/bison.mk
-include mk/valgrind.mk
-
+CC := gcc
+CFLAGS :=
+CFLAGS := -Wall -I$(srcdir)/lib
+# -ll: linkar com o shared object associado ao flex (opcional)
+# CFLAGS += -ll
+# -ly: linkar com o shared object associado ao bison (opcional)
+# CFLAGS += -ly
 # Add debug information for when the parser walks in/walks out of a scope
 # CFLAGS += -DDEBUG_SCOPE
-
 # Print all the scopes and functions detected by the parser
 # CFLAGS += -DDEBUG_PARSER
-
 # Add debug information about the resulting type of each expression 
 # CFLAGS += -DDEBUG_EXPR_TYPE
+
+flex_src := $(srcdir)/src/lexer.yy.c
+flex_hdr := $(srcdir)/lib/lexer.yy.h
+flex_files := $(flex_src) $(flex_hdr)
+FLEX := flex
+FLEXFLAGS :=
+FLEXFLAGS += --header-file=$(flex_hdr)
+FLEXFLAGS += --noline
+
+bison_src := $(srcdir)/src/parser.tab.c
+bison_hdr := $(srcdir)/lib/parser.tab.h
+bison_log := $(srcdir)/parser/parser.log
+bison_files := $(bison_src) $(bison_hdr) $(bison_log)
+BISON := bison
+BISONFLAGS := 
+# --header: generate a header file
+BISONFLAGS += --header=$(bison_hdr)
+# --no-lines: don't use the #line preprocessor macro in the c output file
+BISONFLAGS += --no-lines
+# --token-table: generate a token table (whatever that is lmao)
+BISONFLAGS += --token-table
+# --report all: create a .output file with a report of all the errors
+# BISONFLAGS += --report all
+# --debug: enable tracing
+BISONFLAGS += --debug
+# -Wprecedence: enable warning related to precedence errors/no effect
+BISONFLAGS += -Wprecedence
+# -Wcounterexamples: enable examples which explain the errors
+BISONFLAGS += -Wcounterexamples
+BISONFLAGS += -Wconflicts-sr
+
+VALGRIND := valgrind
+VALGRINDFLAGS := --leak-check=full --show-leak-kinds=all -s
+
+all: prologue $(parsername) $(lexername)
 
 obj:
 	mkdir $@
@@ -39,11 +74,11 @@ prologue:
 	@echo "bison input file: $(yfile)"
 	@echo "flex  input file: $(lfile)"
 
-$(parsername): $(bison_src) $(flex_src) $(src) $(srcdir)/parser/main.c
+$(parsername): $(bison_src) $(flex_src) $(src) $(srcdir)/src/parser.c
 	$(CC) $(CFLAGS) $^ -o $@
 	@echo "Parser executable: $(srcdir)/$@"
 
-$(lexername): $(bison_src) $(flex_src) $(src) $(srcdir)/lexer/main.c
+$(lexername): $(bison_src) $(flex_src) $(src) $(srcdir)/src/lexer.c
 	$(CC) $(CFLAGS) $^ -o $@
 	@echo "Lexer executable: $(srcdir)/$@"
 
@@ -66,7 +101,7 @@ val:
 
 
 test: clean all
-	@./scripts/test.sh $(testcase)
+	@./test -p./$(parsername) $(testcase)
 
 clean:
 	@rm -f $(parsername)
@@ -75,6 +110,7 @@ clean:
 	@rm -f $(bison_files)
 
 echo:
+	@echo "src: $(src)"
 	@echo "flex file: $(lfile)"
 	@echo "flex files: $(flex_files)"
 	@echo "flex flags: $(FLEXFLAGS)"

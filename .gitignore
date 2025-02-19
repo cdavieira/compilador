@@ -5,3 +5,7 @@ compile_commands.json
 mylexer
 myparser
 TODO
+parser.tab.c
+lexer.yy.c
+parser.tab.h
+lexer.yy.h
