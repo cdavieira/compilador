@@ -77,6 +77,7 @@
 #include "FuncTable.h"
 #include "Literal.h"
 #include "Vector.h"
+#include "Stack.h"
 #include "AST.h"
 
 typedef int (*fp_bin_op)(Literal*, Literal*, Literal*);
@@ -92,6 +93,10 @@ ScopeManager* scope_manager;
 FuncTable* functable;
 Vector* funcargs;
 AST* root;
+int varlist_defined;
+int paramlist_defined;
+int* block_defined;
+Stack* block_defined_history;
 
 int yylex(void);
 void yyerror(char const *s);
@@ -104,7 +109,7 @@ void enter_scope(void);
 void exit_scope(void);
 void assign_to_expr(Literal* src, Literal* expr);
 
-void add_var_declaration(char* name, enum Type type);
+AST* add_var_declaration(char* name, enum Type type);
 void check_var_declaration(char* name);
 Variable* get_var(char* name);
 void var_to_expr(char* name, Literal* exp);
@@ -120,6 +125,9 @@ void check_if_while_condition(Literal* exp);
 void check_assignment(Literal* op1, Literal* res);
 
 void ast_manager_add_declarator(AST** declarators, AST* declarator);
+void ast_manager_add_var_decl(AST** varlist, AST* var);
+void ast_manager_add_param_decl(AST** paramlist, AST* param);
+void ast_manager_add_to_block(AST** block, AST* item);
 
 
 
@@ -636,16 +644,16 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   160,   160,   164,   165,   169,   170,   174,   178,   179,
-     183,   184,   185,   186,   187,   188,   192,   192,   192,   206,
-     207,   211,   212,   216,   217,   217,   221,   222,   223,   224,
-     225,   226,   233,   234,   234,   237,   238,   238,   242,   243,
-     247,   248,   249,   253,   254,   255,   256,   257,   261,   262,
-     263,   264,   268,   272,   273,   274,   278,   279,   283,   287,
-     288,   289,   290,   291,   292,   293,   294,   295,   296,   297,
-     298,   299,   300,   301,   302,   303,   304,   305,   306,   307,
-     308,   309,   310,   314,   315,   319,   320,   321,   325,   326,
-     326,   331,   332,   333,   334
+       0,   180,   180,   184,   185,   189,   190,   194,   198,   199,
+     203,   204,   205,   206,   207,   208,   212,   212,   212,   232,
+     233,   237,   238,   242,   251,   251,   260,   261,   262,   263,
+     264,   265,   272,   273,   273,   285,   286,   286,   299,   305,
+     314,   315,   316,   320,   321,   322,   323,   324,   328,   329,
+     330,   331,   335,   339,   340,   341,   345,   346,   350,   354,
+     355,   356,   357,   358,   359,   360,   361,   362,   363,   364,
+     365,   366,   367,   368,   369,   370,   371,   372,   373,   374,
+     375,   376,   377,   381,   382,   386,   387,   388,   392,   393,
+     393,   398,   399,   400,   401
 };
 #endif
 
@@ -1913,7 +1921,7 @@ yyreduce:
     switch (yyn)
       {
   case 2: /* program: declarators  */
-              { root = ast_new_subtree(NODE_PROGRAM, (yyvsp[0].ast), NULL); }
+              { root = (yyvsp[0].ast); }
     break;
 
   case 3: /* declarators: declarator  */
@@ -1925,35 +1933,47 @@ yyreduce:
     break;
 
   case 5: /* declarator: declarator_var  */
-                  { (yyval.ast) = ast_new_node(NODE_VAR_DECL);}
+                  { (yyval.ast) = (yyvsp[0].ast); }
     break;
 
   case 6: /* declarator: declarator_func  */
-                  { (yyval.ast) = ast_new_node(NODE_FUNC_DECL);}
+                  { (yyval.ast) = (yyvsp[0].ast); }
+    break;
+
+  case 7: /* declarator_var: type_specifier init_declarator_list DELI  */
+                                           { (yyval.ast) = (yyvsp[-1].ast); varlist_defined = 0; }
+    break;
+
+  case 8: /* init_declarator_list: init_declarator  */
+                                              { ast_manager_add_var_decl(&(yyval.ast), (yyvsp[0].ast)); }
+    break;
+
+  case 9: /* init_declarator_list: init_declarator COMMA init_declarator_list  */
+                                              { ast_manager_add_var_decl(&(yyvsp[0].ast), (yyvsp[-2].ast)); (yyval.ast) = (yyvsp[0].ast); }
     break;
 
   case 10: /* init_declarator: ID  */
-                                                            { add_var_declaration((yyvsp[0].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[0].str), vartype);  }
     break;
 
   case 11: /* init_declarator: ID ASSIGN expr  */
-                                                            { add_var_declaration((yyvsp[-2].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[-2].str), vartype);  }
     break;
 
   case 12: /* init_declarator: ID LBRACKET INTVAL RBRACKET  */
-                                                            { add_var_declaration((yyvsp[-3].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[-3].str), vartype);  }
     break;
 
   case 13: /* init_declarator: ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY  */
-                                                            { add_var_declaration((yyvsp[-6].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[-6].str), vartype);  }
     break;
 
   case 14: /* init_declarator: ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY  */
-                                                            { add_var_declaration((yyvsp[-7].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[-7].str), vartype);  }
     break;
 
   case 15: /* init_declarator: ID LBRACKET INTVAL RBRACKET ASSIGN STRING  */
-                                                            { add_var_declaration((yyvsp[-5].str), TYPE_STR); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[-5].str), TYPE_STR); }
     break;
 
   case 16: /* $@1: %empty  */
@@ -1972,48 +1992,151 @@ yyreduce:
 	if(add_function_declaration((yyvsp[-6].str), (yyvsp[-7].t)) == -1){
 		exit(1);
 	}
+	(yyval.ast) = ast_new_node(NODE_FUNC);
+	NodeData data;
+	data.lit = (Literal){.type = retvartype};
+	ast_add_child((yyval.ast), (yyvsp[-2].ast));
+	ast_add_child((yyval.ast), (yyvsp[0].ast));
+	ast_set_data((yyval.ast), data);
 	exit_scope();
   }
     break;
 
   case 19: /* declarator_func_end: DELI  */
-              { function_definition = 0; }
+              { function_definition = 0; (yyval.ast) = ast_new_node(NODE_FUNC_BODY); }
     break;
 
   case 20: /* declarator_func_end: func_block  */
-              { function_definition = 1; }
+              { function_definition = 1; (yyval.ast) = ast_new_node(NODE_FUNC_BODY); if((yyvsp[0].ast) != NULL){ ast_add_child((yyval.ast), (yyvsp[0].ast)); } }
+    break;
+
+  case 21: /* opt_func_paramlist: %empty  */
+                  { (yyval.ast) = ast_new_node(NODE_FUNC_PARAMLIST); }
+    break;
+
+  case 22: /* opt_func_paramlist: func_paramlist  */
+                  { (yyval.ast) = (yyvsp[0].ast) ? (yyvsp[0].ast) : ast_new_node(NODE_FUNC_PARAMLIST); }
     break;
 
   case 23: /* func_paramlist: func_param  */
-                { params_count++; }
+             {
+    params_count++;
+    if((yyvsp[0].ast) != NULL){
+      ast_manager_add_param_decl(&(yyval.ast), (yyvsp[0].ast));
+    }
+    else{
+      (yyval.ast) = NULL;
+    }
+  }
     break;
 
   case 24: /* $@3: %empty  */
-                { params_count++; }
+             { params_count++; }
+    break;
+
+  case 25: /* func_paramlist: func_param $@3 COMMA func_paramlist  */
+                                                      {
+    if((yyvsp[-3].ast) != NULL){
+      ast_manager_add_param_decl(&(yyvsp[0].ast), (yyvsp[-3].ast));
+    }
+    (yyval.ast) = (yyvsp[0].ast) ? (yyvsp[0].ast) : NULL;
+  }
+    break;
+
+  case 26: /* func_param: type_specifier  */
+                                                            { (yyval.ast) = NULL; }
     break;
 
   case 27: /* func_param: type_specifier ID  */
-                                                          { add_var_declaration((yyvsp[0].str), vartype); }
+                                                            { (yyval.ast) = add_var_declaration((yyvsp[0].str), vartype); }
     break;
 
   case 28: /* func_param: type_specifier ID LBRACKET RBRACKET  */
-                                                          { add_var_declaration((yyvsp[-2].str), vartype); }
+                                                            { add_var_declaration((yyvsp[-2].str), vartype); }
     break;
 
   case 29: /* func_param: type_specifier ID LBRACKET expr RBRACKET  */
-                                                          { add_var_declaration((yyvsp[-3].str), vartype); }
+                                                            { add_var_declaration((yyvsp[-3].str), vartype); }
+    break;
+
+  case 30: /* func_param: type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR  */
+                                                            { (yyval.ast) = NULL; }
+    break;
+
+  case 31: /* func_param: type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR  */
+                                                            { (yyval.ast) = NULL; }
+    break;
+
+  case 32: /* func_block: LCURLY RCURLY  */
+                { (yyval.ast) = NULL; *block_defined = 0; }
     break;
 
   case 33: /* $@4: %empty  */
-         { function_definition = 0; if(add_function_declaration(funcname, retvartype) == -1){} function_definition = 1; }
+         {
+    function_definition = 0;
+    if(add_function_declaration(funcname, retvartype) == -1){
+
+    }
+    function_definition = 1;
+    *block_defined = 0;
+  }
+    break;
+
+  case 34: /* func_block: LCURLY $@4 block_item_list RCURLY  */
+                           {
+    (yyval.ast) = (yyvsp[-1].ast);
+  }
+    break;
+
+  case 35: /* block: LCURLY RCURLY  */
+                { (yyval.ast) = NULL; }
     break;
 
   case 36: /* $@5: %empty  */
-         { enter_scope(); }
+         {
+    stack_push(block_defined_history, block_defined);
+    block_defined = calloc(1, sizeof(int));
+    enter_scope();
+  }
     break;
 
   case 37: /* block: LCURLY $@5 block_item_list RCURLY  */
-                                                   { exit_scope(); }
+                           {
+    (yyval.ast) = (yyvsp[-1].ast);
+    free(block_defined);
+    block_defined = stack_pop(block_defined_history);
+    exit_scope();
+  }
+    break;
+
+  case 38: /* block_item_list: block_item  */
+             {
+    if((yyvsp[0].ast))
+      ast_manager_add_to_block(&(yyval.ast), (yyvsp[0].ast));
+    else
+      (yyval.ast) = NULL;
+  }
+    break;
+
+  case 39: /* block_item_list: block_item_list block_item  */
+                             {
+    if((yyvsp[0].ast)){
+      ast_manager_add_to_block(&(yyvsp[-1].ast), (yyvsp[0].ast));
+    }
+    (yyval.ast) = (yyvsp[-1].ast) ? (yyvsp[-1].ast) : NULL;
+  }
+    break;
+
+  case 40: /* block_item: declarator_var  */
+                 { (yyval.ast) = (yyvsp[0].ast); }
+    break;
+
+  case 41: /* block_item: stmt  */
+        { (yyval.ast) = NULL; }
+    break;
+
+  case 42: /* block_item: block  */
+        { (yyval.ast) = (yyvsp[0].ast); }
     break;
 
   case 50: /* jump_stmt: RETURN DELI  */
@@ -2432,7 +2555,7 @@ void exit_scope(void){
 	scope_manager_exit(scope_manager);
 }
 
-void add_var_declaration(char* name, enum Type type){
+AST* add_var_declaration(char* name, enum Type type){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
 	if(scope_add(scope, name, yylineno, type) == -1){
 		Variable* var = scope_search_by_name(scope, name);
@@ -2447,6 +2570,14 @@ void add_var_declaration(char* name, enum Type type){
 #ifdef DEBUG_SCOPE
 	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
 #endif
+
+	Variable* var = scope_search_by_name(scope, name);
+	AST* ast = ast_new_node(NODE_VAR_DECL);
+	NodeData data;
+	data.var.var = *var;
+	data.var.scope = scope;
+	ast_set_data(ast, data);
+	return ast;
 }
 
 void check_var_declaration(char* name){
@@ -2574,21 +2705,51 @@ void parser_init(void){
 	functable = func_table_new();
 	scope_manager = scope_manager_new();
 	funcargs = vector_new(12);
+	block_defined = calloc(1, sizeof(int));
+	block_defined_history = stack_new(12);
 }
 
 void parser_deinit(void){
 	scope_manager_destroy(&scope_manager);
 	func_table_destroy(&functable);
 	vector_destroy(&funcargs, NULL);
+	ast_free(root);
+	root = NULL;
+	free(block_defined);
+	stack_destroy(&block_defined_history, free);
 }
 
-void ast_manager_add_declarator(AST** declarators, AST* declarator){
+void ast_manager_add_declarator(AST** program, AST* declarator){
 	static int declarators_defined = 0;
 	if(declarators_defined == 0){
-		*declarators = ast_new_node(NODE_DECLARATORS);
+		*program = ast_new_node(NODE_PROGRAM);
 		declarators_defined = 1;
 	}
-	ast_add_child(*declarators, declarator); 
+	ast_add_child(*program, declarator); 
+}
+
+void ast_manager_add_var_decl(AST** varlist, AST* var){
+	if(varlist_defined == 0){
+		*varlist = ast_new_node(NODE_VAR_LIST);
+		varlist_defined = 1;
+	}
+	ast_add_child(*varlist, var); 
+}
+
+void ast_manager_add_param_decl(AST** paramlist, AST* param){
+	if(paramlist_defined == 0){
+		*paramlist = ast_new_node(NODE_FUNC_PARAMLIST);
+		paramlist_defined = 1;
+	}
+	ast_add_child(*paramlist, param); 
+}
+
+void ast_manager_add_to_block(AST** block, AST* item){
+	if(*block_defined == 0){
+		*block = ast_new_node(NODE_BLOCK);
+		*block_defined = 1;
+	}
+	ast_add_child(*block, item); 
 }
 
 void parser_info(void){

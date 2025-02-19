@@ -21,9 +21,11 @@ Function* func_new(char* name, Scope* scope, enum Type ret, int param_count, int
 	func->scope = scope;
 	if(definition){
 		func->defined = 1;
+		func->declared = 1;
 	}
 	else {
 		func->declared = 1;
+		func->defined = 0;
 	}
 	return func;
 }

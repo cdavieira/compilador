@@ -26,9 +26,11 @@ Stack* stack_new(size_t min){
 }
 
 void stack_destroy(Stack** st, void (*free_element)(void*)){
-	size_t size = (*st)->size;
-	for(size_t i=0; i<size; i++){
-		free_element((*st)->elements[i]);
+	if(free_element != NULL){
+		size_t size = (*st)->size;
+		for(size_t i=0; i<size; i++){
+			free_element((*st)->elements[i]);
+		}
 	}
 	stack_dealloc(st);
 }

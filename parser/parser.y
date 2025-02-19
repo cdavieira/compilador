@@ -20,6 +20,7 @@
 #include "FuncTable.h"
 #include "Literal.h"
 #include "Vector.h"
+#include "Stack.h"
 #include "AST.h"
 
 typedef int (*fp_bin_op)(Literal*, Literal*, Literal*);
@@ -35,6 +36,10 @@ ScopeManager* scope_manager;
 FuncTable* functable;
 Vector* funcargs;
 AST* root;
+int varlist_defined;
+int paramlist_defined;
+int* block_defined;
+Stack* block_defined_history;
 
 int yylex(void);
 void yyerror(char const *s);
@@ -47,7 +52,7 @@ void enter_scope(void);
 void exit_scope(void);
 void assign_to_expr(Literal* src, Literal* expr);
 
-void add_var_declaration(char* name, enum Type type);
+AST* add_var_declaration(char* name, enum Type type);
 void check_var_declaration(char* name);
 Variable* get_var(char* name);
 void var_to_expr(char* name, Literal* exp);
@@ -63,6 +68,9 @@ void check_if_while_condition(Literal* exp);
 void check_assignment(Literal* op1, Literal* res);
 
 void ast_manager_add_declarator(AST** declarators, AST* declarator);
+void ast_manager_add_var_decl(AST** varlist, AST* var);
+void ast_manager_add_param_decl(AST** paramlist, AST* param);
+void ast_manager_add_to_block(AST** block, AST* item);
 
 %}
 
@@ -140,6 +148,18 @@ union Token {
 %nterm <ast> program
 %nterm <ast> declarator
 %nterm <ast> declarators
+%nterm <ast> declarator_var
+%nterm <ast> init_declarator_list
+%nterm <ast> init_declarator
+%nterm <ast> declarator_func
+%nterm <ast> opt_func_paramlist
+%nterm <ast> func_paramlist
+%nterm <ast> func_param 
+%nterm <ast> declarator_func_end
+%nterm <ast> func_block
+%nterm <ast> block
+%nterm <ast> block_item_list
+%nterm <ast> block_item
 %%
 
 /* Recursos fora do escopo desse parser:
@@ -157,7 +177,7 @@ union Token {
 */
 
 program:
-  declarators { root = ast_new_subtree(NODE_PROGRAM, $1, NULL); }
+  declarators { root = $1; }
 ;
 
 declarators:
@@ -166,26 +186,26 @@ declarators:
 ;
 
 declarator:
-  declarator_var  { $$ = ast_new_node(NODE_VAR_DECL);}
-| declarator_func { $$ = ast_new_node(NODE_FUNC_DECL);}
+  declarator_var  { $$ = $1; }
+| declarator_func { $$ = $1; }
 ;
 
 declarator_var:
-  type_specifier init_declarator_list DELI
+  type_specifier init_declarator_list DELI { $$ = $2; varlist_defined = 0; }
 ;
 
 init_declarator_list:
-  init_declarator
-| init_declarator COMMA init_declarator_list
+  init_declarator                             { ast_manager_add_var_decl(&$$, $1); }
+| init_declarator COMMA init_declarator_list  { ast_manager_add_var_decl(&$3, $1); $$ = $3; }
 ;
 
 init_declarator:
-  ID                                                        { add_var_declaration($1, vartype); }
-| ID ASSIGN expr                                            { add_var_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET                               { add_var_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { add_var_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { add_var_declaration($1, vartype); }
-| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { add_var_declaration($1, TYPE_STR); }
+  ID                                                        { $$ = add_var_declaration($1, vartype);  }
+| ID ASSIGN expr                                            { $$ = add_var_declaration($1, vartype);  }
+| ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { $$ = add_var_declaration($1, vartype);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { $$ = add_var_declaration($1, vartype);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { $$ = add_var_declaration($1, TYPE_STR); }
 ;
 
 declarator_func:
@@ -197,56 +217,103 @@ declarator_func:
 	if(add_function_declaration($2, $1) == -1){
 		exit(1);
 	}
+	$$ = ast_new_node(NODE_FUNC);
+	NodeData data;
+	data.lit = (Literal){.type = retvartype};
+	ast_add_child($$, $6);
+	ast_add_child($$, $8);
+	ast_set_data($$, data);
 	exit_scope();
   }
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
 declarator_func_end:
-  DELI        { function_definition = 0; }
-| func_block  { function_definition = 1; }
+  DELI        { function_definition = 0; $$ = ast_new_node(NODE_FUNC_BODY); }
+| func_block  { function_definition = 1; $$ = ast_new_node(NODE_FUNC_BODY); if($1 != NULL){ ast_add_child($$, $1); } }
 ;
 
 opt_func_paramlist:
-  %empty
-| func_paramlist
+  %empty          { $$ = ast_new_node(NODE_FUNC_PARAMLIST); }
+| func_paramlist  { $$ = $1 ? $1 : ast_new_node(NODE_FUNC_PARAMLIST); }
 ;
 
 func_paramlist:
-  func_param    { params_count++; }
-| func_param    { params_count++; } COMMA func_paramlist
+  func_param {
+    params_count++;
+    if($1 != NULL){
+      ast_manager_add_param_decl(&$$, $1);
+    }
+    else{
+      $$ = NULL;
+    }
+  }
+| func_param { params_count++; } COMMA func_paramlist {
+    if($1 != NULL){
+      ast_manager_add_param_decl(&$4, $1);
+    }
+    $$ = $4 ? $4 : NULL;
+  }
 ;
 
 func_param:
-  type_specifier
-| type_specifier ID                                       { add_var_declaration($2, vartype); }
-| type_specifier ID LBRACKET RBRACKET                     { add_var_declaration($2, vartype); }
-| type_specifier ID LBRACKET expr RBRACKET                { add_var_declaration($2, vartype); }
-| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    /* int (*)(...) */
-| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR /* int (*varname)(...) */
+  type_specifier                                            { $$ = NULL; }
+| type_specifier ID                                         { $$ = add_var_declaration($2, vartype); }
+| type_specifier ID LBRACKET RBRACKET                       { add_var_declaration($2, vartype); }
+| type_specifier ID LBRACKET expr RBRACKET                  { add_var_declaration($2, vartype); }
+| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; } /* int (*)(...) */
+| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR { $$ = NULL; } /* int (*varname)(...) */
 ;
 
 /* foi necessario criar um bloco que sirva como ponto de entrada de funções e
  * que não crie um novo escopo para a função (isso já é feito ao criar o escopo
  * da lista de argumentos) */
 func_block:
-  LCURLY RCURLY
-| LCURLY { function_definition = 0; if(add_function_declaration(funcname, retvartype) == -1){} function_definition = 1; } block_item_list RCURLY
+  LCURLY RCURLY { $$ = NULL; *block_defined = 0; }
+| LCURLY {
+    function_definition = 0;
+    if(add_function_declaration(funcname, retvartype) == -1){
+
+    }
+    function_definition = 1;
+    *block_defined = 0;
+  } block_item_list RCURLY {
+    $$ = $3;
+  }
 
 block:
-  LCURLY RCURLY
-| LCURLY { enter_scope(); } block_item_list RCURLY { exit_scope(); }
+  LCURLY RCURLY { $$ = NULL; }
+| LCURLY {
+    stack_push(block_defined_history, block_defined);
+    block_defined = calloc(1, sizeof(int));
+    enter_scope();
+  } block_item_list RCURLY {
+    $$ = $3;
+    free(block_defined);
+    block_defined = stack_pop(block_defined_history);
+    exit_scope();
+  }
 ;
 
 block_item_list:
-  block_item
-| block_item_list block_item
+  block_item {
+    if($1)
+      ast_manager_add_to_block(&$$, $1);
+    else
+      $$ = NULL;
+  }
+| block_item_list block_item {
+    if($2){
+      ast_manager_add_to_block(&$1, $2);
+    }
+    $$ = $1 ? $1 : NULL;
+  }
 ;
 
 block_item:
-  declarator_var
-| stmt
-| block
+  declarator_var { $$ = $1; }
+| stmt  { $$ = NULL; }
+| block { $$ = $1; }
 ;
 
 stmt:
@@ -343,7 +410,7 @@ void exit_scope(void){
 	scope_manager_exit(scope_manager);
 }
 
-void add_var_declaration(char* name, enum Type type){
+AST* add_var_declaration(char* name, enum Type type){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
 	if(scope_add(scope, name, yylineno, type) == -1){
 		Variable* var = scope_search_by_name(scope, name);
@@ -358,6 +425,14 @@ void add_var_declaration(char* name, enum Type type){
 #ifdef DEBUG_SCOPE
 	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
 #endif
+
+	Variable* var = scope_search_by_name(scope, name);
+	AST* ast = ast_new_node(NODE_VAR_DECL);
+	NodeData data;
+	data.var.var = *var;
+	data.var.scope = scope;
+	ast_set_data(ast, data);
+	return ast;
 }
 
 void check_var_declaration(char* name){
@@ -485,21 +560,51 @@ void parser_init(void){
 	functable = func_table_new();
 	scope_manager = scope_manager_new();
 	funcargs = vector_new(12);
+	block_defined = calloc(1, sizeof(int));
+	block_defined_history = stack_new(12);
 }
 
 void parser_deinit(void){
 	scope_manager_destroy(&scope_manager);
 	func_table_destroy(&functable);
 	vector_destroy(&funcargs, NULL);
+	ast_free(root);
+	root = NULL;
+	free(block_defined);
+	stack_destroy(&block_defined_history, free);
 }
 
-void ast_manager_add_declarator(AST** declarators, AST* declarator){
+void ast_manager_add_declarator(AST** program, AST* declarator){
 	static int declarators_defined = 0;
 	if(declarators_defined == 0){
-		*declarators = ast_new_node(NODE_DECLARATORS);
+		*program = ast_new_node(NODE_PROGRAM);
 		declarators_defined = 1;
 	}
-	ast_add_child(*declarators, declarator); 
+	ast_add_child(*program, declarator); 
+}
+
+void ast_manager_add_var_decl(AST** varlist, AST* var){
+	if(varlist_defined == 0){
+		*varlist = ast_new_node(NODE_VAR_LIST);
+		varlist_defined = 1;
+	}
+	ast_add_child(*varlist, var); 
+}
+
+void ast_manager_add_param_decl(AST** paramlist, AST* param){
+	if(paramlist_defined == 0){
+		*paramlist = ast_new_node(NODE_FUNC_PARAMLIST);
+		paramlist_defined = 1;
+	}
+	ast_add_child(*paramlist, param); 
+}
+
+void ast_manager_add_to_block(AST** block, AST* item){
+	if(*block_defined == 0){
+		*block = ast_new_node(NODE_BLOCK);
+		*block_defined = 1;
+	}
+	ast_add_child(*block, item); 
 }
 
 void parser_info(void){

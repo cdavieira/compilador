@@ -3,11 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include "AST.h"
+#include "Literal.h"
 #include "Vector.h"
+#include "Scope.h"
 
 struct AST {
 	NodeKind kind;
 	enum Type type;
+	int id;
 	unsigned char has_data;
 	NodeData data;
 	Vector* children;
@@ -15,13 +18,22 @@ struct AST {
 
 
 
+static void ast_print_rec(AST* ast, int parent);
+
+static void print_node_dot(AST *node);
+
+
+
 /* instantiation/destruction */
 
 AST* ast_new_node(NodeKind kind) {
+	static int node_id = 0;
 	AST* node = malloc(sizeof(struct AST));
 	node->kind = kind;
+	node->type = TYPE_VOID;
 	node->has_data = 0;
 	node->children = vector_new(8);
+	node->id = node_id++;
 	return node;
 }
 
@@ -90,7 +102,7 @@ void ast_set_data(AST* node, NodeData data){
 	switch(node->kind){
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
-			node->type = data.var.token.type;
+			node->type = data.var.var.token.type;
 			node->data = data;
 			node->has_data = 1;
 			break;
@@ -104,7 +116,7 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_OVER:
 		case NODE_PLUS:
 		case NODE_SCANF:
-		case NODE_FUNC_DECL:
+		case NODE_FUNC:
 		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
@@ -137,9 +149,9 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_PROGRAM:
 		case NODE_VAR_LIST:
 		case NODE_WHILE:
-		case NODE_DECLARATORS:
 		case NODE_ARRAY_VAL:
 		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
 			node->type = TYPE_VOID;
 			node->has_data = 0;
 		case NODE_NOCONV:
@@ -154,7 +166,6 @@ void ast_add_child(AST *parent, AST *child) {
 char* ast_kind2str(NodeKind kind) {
 	switch(kind) {
 		case NODE_PROGRAM:      return "program"; 
-		case NODE_DECLARATORS:  return "declarators"; 
 		case NODE_BLOCK:        return "block";
 		case NODE_IF:           return "if"; 
 		case NODE_VAR_LIST:     return "var_list";
@@ -178,8 +189,9 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_WHILE:        return "while";
 		case NODE_SCANF:        return "scanf";
 		case NODE_PRINTF:       return "printf";
-		case NODE_FUNC_DECL:    return "funcdecl";
+		case NODE_FUNC:         return "function";
 		case NODE_FUNC_USE:     return "funcuse";
+		case NODE_FUNC_BODY:    return "funcbody";
 		case NODE_ARRAY_VAL:    return "array";
 		case NODE_I2F:          return "i2f";
 		case NODE_I2C:          return "i2c";
@@ -205,7 +217,7 @@ int ast_has_literal(AST* node) {
 		case NODE_OVER:
 		case NODE_PLUS:
 		case NODE_SCANF:
-		case NODE_FUNC_DECL:
+		case NODE_FUNC:
 		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
@@ -229,9 +241,9 @@ int ast_has_literal(AST* node) {
 		case NODE_VAR_LIST:
 		case NODE_WHILE:
 		case NODE_NOCONV:
-		case NODE_DECLARATORS:
 		case NODE_ARRAY_VAL:
 		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
 			break;
 	}
 	return 0;
@@ -243,7 +255,6 @@ int ast_has_var(AST* node) {
 		case NODE_VAR_USE:
 		    return 1;
 		case NODE_PROGRAM:
-		case NODE_DECLARATORS:
 		case NODE_BLOCK:
 		case NODE_IF:
 		case NODE_VAR_LIST:
@@ -266,7 +277,7 @@ int ast_has_var(AST* node) {
 		case NODE_WHILE:
 		case NODE_SCANF:
 		case NODE_PRINTF:
-		case NODE_FUNC_DECL:
+		case NODE_FUNC:
 		case NODE_FUNC_USE:
 		case NODE_I2F:
 		case NODE_I2C:
@@ -276,6 +287,7 @@ int ast_has_var(AST* node) {
 		case NODE_F2C:
 		case NODE_NOCONV:
 		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
 			break;
 	}
 	return 0;
@@ -293,7 +305,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_OVER:
 		case NODE_PLUS:
 		case NODE_SCANF:
-		case NODE_FUNC_DECL:
+		case NODE_FUNC:
 		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
@@ -301,9 +313,8 @@ Literal* ast_get_literal(AST* node){
 			return &node->data.lit;
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
-			return &node->data.var.token;
+			return &node->data.var.var.token;
 		case NODE_PROGRAM:
-		case NODE_DECLARATORS:
 		case NODE_BLOCK:
 		case NODE_IF:
 		case NODE_VAR_LIST:
@@ -321,28 +332,29 @@ Literal* ast_get_literal(AST* node){
 		case NODE_F2C:
 		case NODE_NOCONV:
 		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
 			break;
 	}
 	return NULL;
 }
 
 
-int ast_id;
-static void ast_print_rec(AST* ast, int parent);
 void ast_print(AST* ast){
 	ast_print_rec(ast, -1);
-	ast_id = 0;
 }
+
+void print_dot(AST *tree) {
+	fprintf(stderr, "digraph {\ngraph [ordering=\"out\"];\n");
+	print_node_dot(tree);
+	fprintf(stderr, "}\n");
+}
+
 static void ast_print_rec(AST* ast, int parent){
-	if(ast_id > 30){
-	  return ;
-	}
 	const char* nodename = ast_kind2str(ast->kind);
 	const char* typename = type_get_name(ast->type);
 	const size_t child_count = vector_get_size(ast->children);
 	void* child;
-	int ast_id_copy = ast_id++;
-	printf("===BEGIN %d (%d)===\n", ast_id_copy, parent);
+	printf("===BEGIN %d (%d)===\n", ast->id, parent);
 	printf("nodekind: %s\n", nodename);
 	printf("type: %s\n", typename);
 	printf("has data: %d\n", ast->has_data);
@@ -353,25 +365,12 @@ static void ast_print_rec(AST* ast, int parent){
 			printf("W: child %lu is NULL\n", i);
 			continue;
 		}
-		ast_print_rec(child, ast_id_copy);
+		ast_print_rec(child, ast->id);
 	}
-	printf("===END %d===\n", ast_id_copy);
+	printf("===END %d===\n", ast->id);
 }
 
-
-// Dot output.
-
-int nr;
-static int print_node_dot(AST *node);
-void print_dot(AST *tree) {
-	nr = 0;
-	fprintf(stderr, "digraph {\ngraph [ordering=\"out\"];\n");
-	print_node_dot(tree);
-	fprintf(stderr, "}\n");
-}
-
-static int print_node_dot(AST *node) {
-	int my_nr = nr++;
+static void print_node_dot(AST *node) {
 	NodeKind kind = node->kind;
 	NodeData data = node->data;
 	enum Type type = node->type;
@@ -379,13 +378,13 @@ static int print_node_dot(AST *node) {
 	const size_t count = ast_get_children_count(node);
 
 	//beginning of label
-	fprintf(stderr, "node%d[label=\"", my_nr);
+	fprintf(stderr, "node%d[label=\"", node->id);
 
 	if(type != TYPE_VOID) {
 		fprintf(stderr, "(%s) ", typename);
 	}
 	if(kind == NODE_VAR_DECL || kind == NODE_VAR_USE) {
-		fprintf(stderr, "%s@", data.var.name);
+		fprintf(stderr, "%s@%d", data.var.var.name, scope_get_id(data.var.scope));
 	}
 	else{
 		fprintf(stderr, "%s", ast_kind2str(kind));
@@ -406,10 +405,15 @@ static int print_node_dot(AST *node) {
 	fprintf(stderr, "\"];\n");
 	//end of label
 
+	AST* child;
 	for(int i = 0; i < count; i++) {
-		int child_nr = print_node_dot(ast_get_child(node, i));
-		fprintf(stderr, "node%d -> node%d;\n", my_nr, child_nr);
+		child = ast_get_child(node, i);
+		if(child != NULL){
+		  print_node_dot(child);
+		}
+		else{
+		  fprintf(stdout, "node%d is null\n", child->id);
+		}
+		fprintf(stderr, "node%d -> node%d;\n", node->id, child->id);
 	}
-
-	return my_nr;
 }

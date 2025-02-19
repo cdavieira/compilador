@@ -2,13 +2,12 @@
 
 #include <stdarg.h>
 #include "Literal.h"
-#include "Literal.h"
 #include "VarTable.h"
+#include "Scope.h"
 
 typedef enum {
 	/* lang */
 	NODE_PROGRAM,
-	NODE_DECLARATORS,
 	NODE_BLOCK,
 	NODE_IF,
 
@@ -43,9 +42,10 @@ typedef enum {
 	/* functions */
 	NODE_SCANF,
 	NODE_PRINTF,
-	NODE_FUNC_DECL,
-	NODE_FUNC_USE,
+	NODE_FUNC,
 	NODE_FUNC_PARAMLIST,
+	NODE_FUNC_BODY,
+	NODE_FUNC_USE,
 
 	/* conversions */
 	NODE_I2F,
@@ -58,10 +58,13 @@ typedef enum {
 } NodeKind;
 
 typedef union NodeData {
-	  Variable var;
-	  Literal lit;
-	  char* str;
-	  void* nil;
+	struct {
+		Scope* scope;
+		Variable var;
+	} var;
+	Literal lit;
+	char* str;
+	void* nil;
 } NodeData;
 
 typedef struct AST AST;

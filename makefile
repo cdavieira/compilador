@@ -10,6 +10,7 @@ src := $(wildcard $(srcdir)/src/*.c)
 lib := $(wildcard $(srcdir)/lib/*.h)
 
 testcase := tests
+testfile := tests/cp5/teste1.c
 
 ##############################################
 
@@ -56,8 +57,13 @@ run:
 	./$(parsername) 2> $(bison_log)
 	@echo "Output saved to: $(bison_log)"
 
+pdf: clean all
+	./$(parsername) <$(testfile) 2>$(notdir $(testfile)).dot
+	dot -Tpdf $(notdir $(testfile)).dot > $(notdir $(testfile)).pdf
+
 val:
-	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < tests/semantics/big.c
+	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < $(testfile)
+
 
 test: clean all
 	@./scripts/test.sh $(testcase)
