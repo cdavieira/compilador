@@ -25,5 +25,5 @@ int variable_name_equals(Variable* var, const char* name){
 }
 
 void variable_print(Variable* var){
-	printf("name='%s', line=%d, type=%d\n", var->name, var->line, var->token.type);
+	printf("name='%s', line=%d, type=%d, qualifier=%d\n", var->name, var->line, var->token.type, var->qualifier);
 }

@@ -47,6 +47,7 @@ typedef enum {
 	NODE_FUNC_PARAMLIST,
 	NODE_FUNC_BODY,
 	NODE_FUNC_USE,
+	NODE_FUNC_RET,
 	NODE_FCALL,
 
 	/* conversions */
@@ -67,10 +68,6 @@ typedef union NodeData {
 	struct {
 		Function* func;
 	} func;
-	struct {
-		Variable var;
-		int sz;
-	} arr;
 	Literal lit;
 	char* str;
 	void* nil;

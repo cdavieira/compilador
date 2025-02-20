@@ -106,13 +106,9 @@ void ast_set_data(AST* node, NodeData data){
 			node->data = data;
 			node->has_data = 1;
 			break;
-		case NODE_ARRAY_VAL:
-			node->type = data.arr.var.token.type;
-			node->data = data;
-			node->has_data = 1;
-			break;
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
+		case NODE_ARRAY_VAL:
 			node->type = data.var.var.token.type;
 			node->data = data;
 			node->has_data = 1;
@@ -128,6 +124,7 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_PLUS:
 		case NODE_SCANF:
 		case NODE_FUNC:
+		case NODE_FUNC_RET:
 		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
@@ -212,6 +209,7 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_F2C:          return "f2c";
 		case NODE_NOCONV:       return "noconv";
 		case NODE_FUNC_PARAMLIST: return "paramlist";
+		case NODE_FUNC_RET:     return "funcret";
 	}
 	return "ERROR!!";
 }
@@ -256,6 +254,7 @@ int ast_has_literal(AST* node) {
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
 		case NODE_FCALL:
+		case NODE_FUNC_RET:
 			break;
 	}
 	return 0;
@@ -301,6 +300,7 @@ int ast_has_var(AST* node) {
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
 		case NODE_FCALL:
+		case NODE_FUNC_RET:
 			break;
 	}
 	return 0;
@@ -327,7 +327,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
 		case NODE_ARRAY_VAL:
-			return &node->data.arr.var.token;
+			return &node->data.var.var.token;
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
 		case NODE_IF:
@@ -347,6 +347,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
 		case NODE_FCALL:
+		case NODE_FUNC_RET:
 			break;
 	}
 	return NULL;
@@ -406,7 +407,7 @@ static void print_node_dot(AST *node) {
 	}
 
 	if(kind == NODE_ARRAY_VAL){
-		fprintf(stderr, "#%lu", vector_get_size(node->children));
+		fprintf(stderr, "#%d", node->data.var.var.qualifier);
 	}
 
 	if(ast_has_literal(node)) {

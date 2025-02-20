@@ -8,7 +8,6 @@ typedef union Value {
 } Value ;
 
 enum Type {
-	TYPE_OK = -1,
 	TYPE_VOID = 0,
 	TYPE_INT,
 	TYPE_FLT,
@@ -21,9 +20,16 @@ typedef struct Literal {
 	Value value;
 } Literal;
 
+enum Qualifier {
+	QUALIFIER_POINTER = -1,
+	QUALIFIER_BASIC = 0,
+	//QUALIFIER_ARRAY > 0
+};
+
 typedef struct Variable {
 	char* name;
 	int line;
+	enum Qualifier qualifier;
 	Literal token;
 } Variable;
 

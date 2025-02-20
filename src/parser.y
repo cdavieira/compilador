@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "typesys.h"
 #include "ScopeManager.h"
@@ -51,8 +52,7 @@ void enter_scope(void);
 void exit_scope(void);
 void assign_to_expr(Literal* src, Literal* expr);
 
-AST* add_var_declaration(char* name, enum Type type, AST* init);
-AST* add_arr_declaration(char* name, enum Type type, AST* init, int count);
+AST* add_var_declaration(char* name, enum Type type, enum Qualifier qualifier, AST* init);
 void check_var_declaration(char* name);
 Variable* get_var(char* name);
 void var_to_expr(char* name, Literal* exp);
@@ -78,6 +78,10 @@ AST* ast_manager_add_conv(AST* data, Conversion conv);
 AST* ast_manager_from_literal(Literal* lit);
 AST* ast_manager_from_id(char* name);
 AST* ast_manager_assign_stmt(char* name, AST* expr);
+AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val);
+AST* ast_manager_if_stmt(AST* expr, AST* ifblock, AST* elseblock);
+AST* ast_manager_while_stmt(AST* expr, AST* block);
+AST* ast_manager_add_funcret(AST* expr);
 AST* ast_manager_fcall(char* funcname);
 
 %}
@@ -216,12 +220,12 @@ init_declarator_list:
 ;
 
 init_declarator:
-  ID                                                        { $$ = add_var_declaration($1, vartype,  NULL);  }
-| ID ASSIGN expr                                            { $$ = add_var_declaration($1, vartype,  $3);  }
-| ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype,  NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { $$ = add_var_declaration($1, vartype,  NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { $$ = add_var_declaration($1, vartype,  NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { $$ = add_var_declaration($1, TYPE_STR, NULL); }
+  ID                                                        { $$ = add_var_declaration($1, vartype,  QUALIFIER_BASIC, NULL);  }
+| ID ASSIGN expr                                            { $$ = add_var_declaration($1, vartype,  QUALIFIER_BASIC, $3);  }
+| ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { $$ = add_var_declaration($1, TYPE_STR, $3.value.i, NULL); }
 ;
 
 declarator_func:
@@ -274,9 +278,8 @@ func_paramlist:
 
 func_param:
   type_specifier                                            { $$ = NULL; }
-| type_specifier ID                                         { $$ = add_var_declaration($2, vartype, NULL); }
-| type_specifier ID LBRACKET RBRACKET                       { add_var_declaration($2, vartype, NULL); }
-| type_specifier ID LBRACKET expr RBRACKET                  { add_var_declaration($2, vartype, NULL); }
+| type_specifier ID                                         { $$ = add_var_declaration($2, vartype, QUALIFIER_BASIC, NULL); }
+| type_specifier ID LBRACKET INTVAL RBRACKET                { $$ = add_var_declaration($2, vartype, $4.value.i, NULL); }
 | type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; } /* int (*)(...) */
 | type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR { $$ = NULL; } /* int (*varname)(...) */
 ;
@@ -334,32 +337,32 @@ block_item:
 
 stmt:
   assign_stmt { $$ = $1; }
-| if_stmt     { $$ = NULL; }
-| while_stmt  { $$ = NULL; }
-| jump_stmt   { $$ = NULL; }
+| if_stmt     { $$ = $1; }
+| while_stmt  { $$ = $1; }
+| jump_stmt   { $$ = $1; }
 | fcall_stmt  { $$ = $1; }
 ;
 
 jump_stmt:
   CONTINUE DELI      { $$ = NULL; }
 | BREAK DELI         { $$ = NULL; }
-| RETURN DELI        { check_function_return(TYPE_VOID); $$ = NULL; }
-| RETURN expr DELI   { check_function_return(ast_get_type($2));  $$ = NULL; }
+| RETURN DELI        { check_function_return(TYPE_VOID); $$ = ast_manager_add_funcret(NULL); }
+| RETURN expr DELI   { check_function_return(ast_get_type($2));  $$ = ast_manager_add_funcret($2); }
 ;
 
 while_stmt:
-  WHILE LPAR expr RPAR block   { check_if_while_condition(ast_get_literal($3)); }
+  WHILE LPAR expr RPAR block   { check_if_while_condition(ast_get_literal($3)); $$ = ast_manager_while_stmt($3, $5); }
 ;
 
 if_stmt:
-  IF LPAR expr RPAR block              { check_if_while_condition(ast_get_literal($3)); }
-| IF LPAR expr RPAR block ELSE block   { check_if_while_condition(ast_get_literal($3)); }
-| IF LPAR expr RPAR block ELSE if_stmt { check_if_while_condition(ast_get_literal($3)); }
+  IF LPAR expr RPAR block              { check_if_while_condition(ast_get_literal($3)); $$ = ast_manager_if_stmt($3, $5, NULL); }
+| IF LPAR expr RPAR block ELSE block   { check_if_while_condition(ast_get_literal($3)); $$ = ast_manager_if_stmt($3, $5, $7); }
+| IF LPAR expr RPAR block ELSE if_stmt { check_if_while_condition(ast_get_literal($3)); $$ = ast_manager_if_stmt($3, $5, $7); }
 ;
 
 assign_stmt:
   ID ASSIGN expr DELI                          { check_var_declaration($1); check_assignment($1, $3); $$ = ast_manager_assign_stmt($1, $3); }
-| ID LBRACKET expr RBRACKET ASSIGN expr DELI   { check_var_declaration($1); check_assignment($1, $3); $$ = ast_manager_assign_stmt($1, $3); }
+| ID LBRACKET expr RBRACKET ASSIGN expr DELI   { check_var_declaration($1); check_assignment($1, $3); $$ = ast_manager_assign_stmt_arr($1, $3, $6); }
 ;
 
 fcall_stmt:
@@ -425,9 +428,9 @@ void exit_scope(void){
 	scope_manager_exit(scope_manager);
 }
 
-AST* add_var_declaration(char* name, enum Type type, AST* init){
+AST* add_var_declaration(char* name, enum Type type, enum Qualifier qualifier, AST* init){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
-	if(scope_add(scope, name, yylineno, type) == -1){
+	if(scope_add(scope, name, yylineno, type, qualifier) == -1){
 		Variable* var = scope_search_by_name(scope, name);
 		printf("SEMANTIC ERROR (%d): variable %s has been declared already\n", var->line, name);
 		exit(1);
@@ -447,39 +450,23 @@ AST* add_var_declaration(char* name, enum Type type, AST* init){
 	data.var.var = *var;
 	data.var.scope = scope;
 	ast_set_data(ast, data);
-	if(init != NULL){
-		ast_add_child(ast, init);
+
+	//making sure we are dealing with either a basic type or with an array type
+	assert((qualifier == QUALIFIER_BASIC) || (qualifier != QUALIFIER_POINTER));
+
+	if(qualifier == QUALIFIER_BASIC){
+		if(init != NULL){
+			ast_add_child(ast, init);
+		}
 	}
+	else{ //array
+		AST* arrayval = ast_new_node(NODE_ARRAY_VAL);
+		ast_set_data(arrayval, data);
+		ast_add_child(ast, arrayval);
+	}
+
 	return ast;
 }
-
-// AST* add_arr_declaration(char* name, enum Type type, AST* init, int count){
-// 	Scope* scope = scope_manager_get_current_scope(scope_manager);
-// 	if(scope_add(scope, name, yylineno, type) == -1){
-// 		Variable* var = scope_search_by_name(scope, name);
-// 		printf("SEMANTIC ERROR (%d): variable %s has been declared already\n", var->line, name);
-// 		exit(1);
-// 	}
-// 	if(type == TYPE_VOID){
-// 		Variable* var = scope_search_by_name(scope, name);
-// 		printf("SEMANTIC ERROR (%d): variable %s has been declared with type VOID\n", var->line, name);
-// 		exit(1);
-// 	}
-// #ifdef DEBUG_SCOPE
-// 	printf("Variable %s added to scope %d\n", name, scope_get_id(scope));
-// #endif
-
-// 	Variable* var = scope_search_by_name(scope, name);
-// 	AST* ast = ast_new_node(NODE_VAR_DECL);
-// 	NodeData data;
-// 	data.arr.var = *var;
-// 	data.arr.sz = count;
-// 	ast_set_data(ast, data);
-// 	if(init != NULL){
-// 		ast_add_child(ast, init);
-// 	}
-// 	return ast;
-// }
 
 void check_var_declaration(char* name){
 	if(scope_manager_search_by_name(scope_manager, name) == NULL){
@@ -608,6 +595,8 @@ void check_assignment(char* name, AST* expr){
 void parser_init(void){
 	functable = func_table_new();
 	scope_manager = scope_manager_new();
+	func_table_add(functable, "printf", scope_manager_get_current_scope(scope_manager), TYPE_VOID, 10, 1);
+	func_table_add(functable, "scanf", scope_manager_get_current_scope(scope_manager), TYPE_VOID, 10, 1);
 	funcargs = vector_new(12);
 	block_defined = calloc(1, sizeof(int));
 	block_defined_history = stack_new(12);
@@ -741,12 +730,13 @@ AST* ast_manager_assign_stmt(char* name, AST* expr){
 	AST* stmt = ast_new_node(NODE_ASSIGN);
 	AST* var = ast_manager_from_id(name);
 	NodeData data;
-	data.lit.type = ast_get_type(expr);
+	data.lit.type = ast_get_type(var);
 	ast_add_child(stmt, var);
 	ast_add_child(stmt, expr);
 	ast_set_data(stmt, data);
 	return stmt;
 }
+
 
 AST* ast_manager_fcall(char* funcname){
 	AST* node  = ast_new_node(NODE_FCALL);
@@ -759,6 +749,52 @@ AST* ast_manager_fcall(char* funcname){
 		ast_add_child(node, vector_get_item(funcargs, i));
 	}
 	return node;
+}
+
+AST* ast_manager_if_stmt(AST* expr, AST* ifblock, AST* elseblock){
+	AST* node  = ast_new_node(NODE_IF);
+	ast_add_child(node, expr);
+	if(ifblock != NULL){
+		ast_add_child(node, ifblock);
+	}
+	if(elseblock != NULL){
+		ast_add_child(node, elseblock);
+	}
+	return node;
+}
+
+AST* ast_manager_while_stmt(AST* expr, AST* block){
+	AST* node  = ast_new_node(NODE_WHILE);
+	if(expr != NULL){
+		ast_add_child(node, expr);	
+	}
+	if(block != NULL){
+		ast_add_child(node, block);
+	}
+	return node;
+}
+
+AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
+	AST* stmt = ast_new_node(NODE_ASSIGN);
+	AST* var = ast_manager_from_id(name);
+	NodeData data;
+	data.lit.type = ast_get_type(var);
+	ast_add_child(var, idx);
+	ast_add_child(stmt, var);
+	ast_add_child(stmt, val);
+	ast_set_data(stmt, data);
+	return stmt;
+}
+
+AST* ast_manager_add_funcret(AST* expr){
+	AST* stmt = ast_new_node(NODE_FUNC_RET);
+	if(expr != NULL){
+		ast_add_child(stmt, expr);
+	}
+	NodeData data;
+	data.lit.type = expr == NULL ? TYPE_VOID : ast_get_type(expr);
+	ast_set_data(stmt, data);
+	return stmt;
 }
 
 void parser_info(void){

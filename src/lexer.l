@@ -156,6 +156,13 @@ static void save_id(void){
 
 static void save_string(void){
 	char* str = alloc_str(yytext);
+	int leng = strlen(str);
+	if(leng >= 1 && str[0] == '"'){
+		str[0] = ' ';
+	}
+	if(leng >= 2 && str[leng-1] == '"'){
+		str[leng-1] = ' ';
+	}
 	yylval.l.type = TYPE_STR;
 	yylval.l.value.s = str;
 }

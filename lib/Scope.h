@@ -13,5 +13,5 @@ int scope_get_parent(Scope* scope);
 int scope_get_level(Scope* scope);
 VarTable* scope_get_vartable(Scope* scope);
 
-int scope_add(Scope* scope, char* name, int line, enum Type type);
+int scope_add(Scope* scope, char* name, int line, enum Type type, enum Qualifier qualifier);
 Variable* scope_search_by_name(Scope* scope, const char* name);
