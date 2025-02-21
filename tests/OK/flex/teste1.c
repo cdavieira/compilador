@@ -25,14 +25,10 @@ void main(){
         comment line 2
         comment line 3  */
 
-    for(int j = 0; j <= 10; j++){
-        i = i + 1;
-    }
-
     printf("i=%d \n a=%d \n x=%d \n y=%.1f \n f=%f \n string=%s\n", i, a, x, y, f, string);
 
     printf("Resultado da multiplicacao eh = %f\n", function(x, y));
-    if(function(x,y)>=10){
+    if(function(x,y)>10){
         printf("maior ou igual a 10");
     }else{
         printf("meenor que 10");

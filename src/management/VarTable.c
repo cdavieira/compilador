@@ -19,7 +19,8 @@ int vartable_add(
 	VarTable* vt,
 	char* s,
 	int line,
-	enum Type type)
+	enum Type type,
+	enum Qualifier qualifier)
 {
 	Variable* var = malloc(sizeof(Variable));
 	if(var == NULL){
@@ -27,6 +28,7 @@ int vartable_add(
 	}
 	var->name = s;
 	var->line = line;
+	var->qualifier = qualifier;
 	var->token.type = type;
 	vector_append(vt->t, var);
 	return 0;
@@ -54,6 +56,7 @@ void vartable_print(VarTable* vt){
 		printf("name: %s, ", var->name);
 		printf("line: %d, ", var->line);
 		printf("type: %s\n", type_name(var->token.type));
+		printf("qualifier: %d\n", var->qualifier);
 	}
 }
 

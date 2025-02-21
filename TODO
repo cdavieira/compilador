@@ -10,6 +10,8 @@ separado e checar se ha algum conflito de nomes
 
 * [ ] change this msg: "SEMANTIC ERROR (24): conditional expression in IF/REPEAT is 'char' instead of 'int'"
 * [ ] investigar caso de teste 'tests/typesystem/if.c' (retorno da linha errado)
+* [ ] fazer ast arrays
+* [ ] corrigir leaks de memoria (cp5/block1.c)
 
 * [ ] fazer 'fcaller' (ast)
 * [ ] fazer 'array' (ast)

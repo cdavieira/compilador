@@ -11,7 +11,8 @@ int vartable_add(
 	VarTable* vt,
 	char* s,
 	int line,
-	enum Type type);
+	enum Type type,
+	enum Qualifier qualifier);
 
 Variable* vartable_search(VarTable* vt, const char* name);
 
