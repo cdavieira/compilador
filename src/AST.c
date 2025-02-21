@@ -323,6 +323,10 @@ Literal* ast_get_literal(AST* node){
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
 			return &node->data.lit;
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
@@ -332,10 +336,6 @@ Literal* ast_get_literal(AST* node){
 		case NODE_BLOCK:
 		case NODE_IF:
 		case NODE_VAR_LIST:
-		case NODE_GT:
-		case NODE_NE:
-		case NODE_OR:
-		case NODE_AND:
 		case NODE_WHILE:
 		case NODE_I2F:
 		case NODE_I2C:

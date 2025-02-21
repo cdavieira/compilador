@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stddef.h>
-#include "type/Variable.h"
+#include "Literal.h"
 
 typedef struct VarTable VarTable;
 

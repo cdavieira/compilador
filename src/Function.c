@@ -1,5 +1,5 @@
-#include "type/Scope.h"
-#include "type/Function.h"
+#include "Scope.h"
+#include "Function.h"
 
 #include <string.h>
 #include <malloc.h>

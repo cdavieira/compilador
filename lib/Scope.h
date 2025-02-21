@@ -1,6 +1,6 @@
 #pragma once
 
-#include "management/VarTable.h"
+#include "VarTable.h"
 
 typedef struct Scope Scope;
 

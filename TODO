@@ -8,17 +8,10 @@ separado e checar se ha algum conflito de nomes
 * [ ] Checar se os parametros das funcoes tem o mesmo tipo daqueles que sao passados
 * [ ] Passar o retorno da funcao para o tipo da expressao
 
-* [ ] change this msg: "SEMANTIC ERROR (24): conditional expression in IF/REPEAT is 'char' instead of 'int'"
 * [ ] investigar caso de teste 'tests/typesystem/if.c' (retorno da linha errado)
 * [ ] fazer ast arrays
 * [ ] corrigir leaks de memoria (cp5/block1.c)
-
-* [ ] fazer 'fcaller' (ast)
-* [ ] fazer 'array' (ast)
-* [ ] fazer 'funcoes' (ast)
-* [ ] remover arquivos do git (TODO e unnecessary stufff)
-
-* [ ] melhorar sistema de testes para saber lidar com problemas que se espera encontrar problemas
+* [ ]
 
 ```
 nc -l -p 5555

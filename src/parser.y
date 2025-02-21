@@ -555,8 +555,8 @@ void check_if_while_condition(Literal* exp){
 		case TYPE_STR:
 		case TYPE_CHAR:
 		default:
-		fprintf(stdout, "SEMANTIC ERROR (%d): conditional expression in IF/WHILE", yylineno);
-		fprintf(stdout, " is '%s' instead of 'int'\n", type_name(exp->type));
+			fprintf(stdout, "SEMANTIC ERROR (%d): conditional expression in IF/WHILE", yylineno);
+			fprintf(stdout, " is '%s' instead of 'int'\n", type_name(exp->type));
 			break;
 	}
 }
@@ -802,6 +802,8 @@ void parser_info(void){
 	scope_manager_print(scope_manager);
 	func_table_print(functable);
 #endif
+#ifdef DEBUG_AST
 	ast_print(root);
 	print_dot(root);
+#endif
 }

@@ -1,4 +1,5 @@
 #include "typesys.h"
+#include <stdio.h>
 
 static const TypeData arith_table_lookup[][4] = {
 	{{TYPE_VOID,}, {TYPE_VOID,}, {TYPE_VOID,}, {TYPE_VOID,}},
@@ -100,7 +101,7 @@ const TypeData typesys_ne(enum Type op1, enum Type op2){
 const TypeData typesys_assign(enum Type lhs, enum Type rhs){
 #ifdef DEBUG_EXPR_TYPE
 	printf("Expression type debug: %s = %s\n",
-		type_name(res), type_name(op1->type->type));
+		type_name(lhs), type_name(rhs));
 #endif
 	return assign_table_lookup[lhs][rhs];
 }

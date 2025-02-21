@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "management/VarTable.h"
-#include "type/Literal.h"
-#include "container/Vector.h"
+#include "VarTable.h"
+#include "Literal.h"
+#include "Vector.h"
 
 struct VarTable {
 	Vector* t;
@@ -38,9 +38,9 @@ Variable* vartable_search(VarTable* vt, const char* s) {
 	return vector_search(vt->t, (void*) s, (int (*)(void*, void*)) variable_name_equals);
 }
 
-Variable* vartable_sofisticated_search(VarTable* vt, Variable* var){
-	return vector_search(vt->t, (void*) var, (int (*)(void*, void*)) variable_cmp);
-}
+// Variable* vartable_sofisticated_search(VarTable* vt, Variable* var){
+// 	return vector_search(vt->t, (void*) var, (int (*)(void*, void*)) variable_cmp);
+// }
 
 Variable* vartable_idx(VarTable* vt, size_t idx){
 	return vector_get_item(vt->t, idx);

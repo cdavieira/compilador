@@ -1,7 +1,7 @@
-#include "management/ScopeManager.h"
-#include "type/Scope.h"
-#include "container/Vector.h"
-#include "container/Stack.h"
+#include "ScopeManager.h"
+#include "Scope.h"
+#include "Vector.h"
+#include "Stack.h"
 
 #include <stdio.h>
 #include <malloc.h>
@@ -24,8 +24,8 @@ static void scope_manager_print_recursive(
 		ScopeManager* manager, Scope* scope);
 static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name);
-static int scope_manager_search_recursive(
-	ScopeManager* manager, Scope* scope, Variable* search);
+//static int scope_manager_search_recursive(
+//	ScopeManager* manager, Scope* scope, Variable* search);
 
 ScopeManager* scope_manager_new(void){
 	ScopeManager* manager = malloc(sizeof(ScopeManager));
@@ -119,30 +119,30 @@ Scope* scope_manager_search_by_name(ScopeManager* manager, const char* varname){
 	return scope;
 }
 
-Scope* scope_manager_search(ScopeManager* manager, Variable* var){
-	Scope* scope = scope_manager_get_current_scope(manager);
-	int idx = scope_manager_search_recursive(manager, scope, var);
-	if(idx == -1){
-		return NULL;
-	}
-	scope = vector_get_item(manager->scopes, idx);
-	return scope;
-}
+//Scope* scope_manager_search(ScopeManager* manager, Variable* var){
+//	Scope* scope = scope_manager_get_current_scope(manager);
+//	int idx = scope_manager_search_recursive(manager, scope, var);
+//	if(idx == -1){
+//		return NULL;
+//	}
+//	scope = vector_get_item(manager->scopes, idx);
+//	return scope;
+//}
 
-static int scope_manager_search_recursive(
-	ScopeManager* manager, Scope* scope, Variable* search)
-{
-	if(scope_search(scope, search) != NULL){
-		return scope_get_id(scope);
-	}
-
-	if(scope_get_parent(scope) == -1){
-		return -1;
-	}
-
-	Scope* parent = vector_get_item(manager->scopes, scope_get_parent(scope));
-	return scope_manager_search_recursive(manager, parent, search);
-}
+//static int scope_manager_search_recursive(
+//	ScopeManager* manager, Scope* scope, Variable* search)
+//{
+//	if(scope_search(scope, search) != NULL){
+//		return scope_get_id(scope);
+//	}
+//
+//	if(scope_get_parent(scope) == -1){
+//		return -1;
+//	}
+//
+//	Scope* parent = vector_get_item(manager->scopes, scope_get_parent(scope));
+//	return scope_manager_search_recursive(manager, parent, search);
+//}
 
 static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name)

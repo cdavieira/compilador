@@ -13,7 +13,7 @@ int main(){
   float b = 1.5;
 
   while(b > num){
-    b = b - 1;
+  /*   b = b - 1; */
   }
 
   if('b'){
@@ -21,8 +21,8 @@ int main(){
   }
 
 
-  int a = "a" + 1;
-  char c = 'c';
+  /* int a = "a" + 1; */
+  /* char c = 'c'; */
   // if(a + b + c){
   //   printf("OKay lets go\n");
   // }
