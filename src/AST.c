@@ -109,7 +109,7 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
 		case NODE_ARRAY_VAL:
-			node->type = data.var.var.token.type;
+			node->type = data.var.var.type;
 			node->data = data;
 			node->has_data = 1;
 			break;
@@ -331,7 +331,6 @@ Literal* ast_get_literal(AST* node){
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
 		case NODE_ARRAY_VAL:
-			return &node->data.var.var.token;
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
 		case NODE_IF:

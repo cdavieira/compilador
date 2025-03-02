@@ -30,7 +30,7 @@ typedef struct Variable {
 	char* name;
 	int line;
 	enum Qualifier qualifier;
-	Literal token;
+	enum Type type;
 } Variable;
 
 const char* type_name(enum Type type);

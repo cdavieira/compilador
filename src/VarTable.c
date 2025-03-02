@@ -29,7 +29,7 @@ int vartable_add(
 	var->name = s;
 	var->line = line;
 	var->qualifier = qualifier;
-	var->token.type = type;
+	var->type = type;
 	vector_append(vt->t, var);
 	return 0;
 }
@@ -55,7 +55,7 @@ void vartable_print(VarTable* vt){
 		printf("Var %d -- ", i);
 		printf("name: %s, ", var->name);
 		printf("line: %d, ", var->line);
-		printf("type: %s\n", type_name(var->token.type));
+		printf("type: %s\n", type_name(var->type));
 		printf("qualifier: %d\n", var->qualifier);
 	}
 }

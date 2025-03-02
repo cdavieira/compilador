@@ -70,7 +70,7 @@ AST* binary_operation(
 void check_if_while_condition(enum Type type);
 void check_assignment(char* name, AST* expr);
 
-void ast_manager_add_declaration(AST** declarations, AST* declaration);
+void ast_manager_add_declarator(AST** declarators, AST* declarator);
 void ast_manager_add_var_decl(AST** varlist, AST* var);
 void ast_manager_add_param_decl(AST** paramlist, AST* param);
 void ast_manager_add_to_block(AST** block, AST* item);
@@ -83,48 +83,6 @@ AST* ast_manager_if_stmt(AST* expr, AST* ifblock, AST* elseblock);
 AST* ast_manager_while_stmt(AST* expr, AST* block);
 AST* ast_manager_add_funcret(AST* expr);
 AST* ast_manager_fcall(char* funcname);
-
-
-void function_prepare(char* name, enum Type type){
-  funcname = name;
-  retvartype = type;
-  // params_count = 0;
-  // enter_scope();
-}
-
-AST* function_settle2(char *name, enum Type type, AST* params, AST* fblock){
-  function_definition = fblock == NULL ? 0 : 1;
-  if(add_function_declaration(name, type) == -1){
-	  exit(1);
-  }
-  AST* ast = ast_new_node(NODE_FUNC);
-  AST* head = params != NULL ? params : ast_new_node(NODE_FUNC_PARAMLIST);
-  AST* body = ast_new_node(NODE_FUNC_BODY); 
-  if(fblock != NULL){
-    ast_add_child(body, fblock);
-  }
-  NodeData data;
-  data.lit = (Literal){.type = retvartype};
-  ast_add_child(ast, head);
-  ast_add_child(ast, body);
-  ast_set_data(ast, data);
-  exit_scope();
-  return ast;
-}
-
-AST* function_settle(char *name, enum Type type, AST* head, AST* body){
-  if(add_function_declaration(name, type) == -1){
-	  exit(1);
-  }
-  AST* ast = ast_new_node(NODE_FUNC);
-  NodeData data;
-  data.lit = (Literal){.type = retvartype};
-  ast_add_child(ast, head);
-  ast_add_child(ast, body);
-  ast_set_data(ast, data);
-  exit_scope();
-  return ast;
-}
 
 %}
 
@@ -200,21 +158,16 @@ union Token {
 %nterm <str> fcaller
 %nterm <t> type_specifier
 %nterm <ast> program
-%nterm <ast> declaration
-%nterm <ast> declarations
-%nterm <ast> declaration_var
-%nterm <ast> declarators
 %nterm <ast> declarator
-%nterm <ast> declarator_basic
-%nterm <ast> declarator_array
-%nterm <ast> declaration_func
+%nterm <ast> declarators
+%nterm <ast> declarator_var
+%nterm <ast> init_declarator_list
+%nterm <ast> init_declarator
+%nterm <ast> declarator_func
+%nterm <ast> opt_func_paramlist
 %nterm <ast> func_paramlist
-%nterm <ast> func_paramlistZZZ
 %nterm <ast> func_param 
-%nterm <ast> func_param_basic
-%nterm <ast> func_param_array
-%nterm <ast> func_param_fp
-// %nterm <ast> declaration_func_end
+%nterm <ast> declarator_func_end
 %nterm <ast> func_block
 %nterm <ast> block
 %nterm <ast> block_item_list
@@ -238,75 +191,74 @@ union Token {
 */
 
 /* Dicionário
-  * declaration_var: linha unica do programa onde se declara 1 ou mais variaveis. A linha começa com o tipo das variaveis e continua com o **nome das variaveis** ou **declarators**
-  * declarator: nome de uma variavel
+  * declarator: declaracao de recursos que armazenam estado (variaveis e funcoes)
   * stmt: comandos 'builtin' da linguagem (if, while, ...) + chamada de funcoes
-  * block: o bloco de definição de uma função, que pode ter stmts e declarations para variaveis
+  * block: o bloco de definição de uma função, que pode ter stmts e declarators para variaveis
 */
 
 program:
-  declarations { root = $1; }
-;
-
-declarations:
-  declaration              { ast_manager_add_declaration(&$$, $1); }
-| declaration declarations { ast_manager_add_declaration(&$2, $1); $$ = $2; }
-;
-
-
-/* Declaração de variáveis (global/scope) */
-
-declaration:
-  declaration_var  { $$ = $1; }
-| declaration_func { $$ = $1; }
-;
-
-declaration_var:
-  type_specifier declarators DELI { $$ = $2; varlist_defined = 0; }
+  declarators { root = $1; }
 ;
 
 declarators:
-  declarator                    { ast_manager_add_var_decl(&$$, $1); }
-| declarator COMMA declarators  { ast_manager_add_var_decl(&$3, $1); $$ = $3; }
+  declarator             { ast_manager_add_declarator(&$$, $1); }
+| declarator declarators { ast_manager_add_declarator(&$2, $1); $$ = $2; }
 ;
 
 declarator:
-  declarator_basic { $$ = $1; }
-| declarator_array { $$ = $1; }
+  declarator_var  { $$ = $1; }
+| declarator_func { $$ = $1; }
 ;
 
-declarator_basic:
-  ID             { $$ = add_var_declaration($1, vartype, QUALIFIER_BASIC, NULL);  }
-| ID ASSIGN expr { $$ = add_var_declaration($1, vartype, QUALIFIER_BASIC, $3);  }
+declarator_var:
+  type_specifier init_declarator_list DELI { $$ = $2; varlist_defined = 0; }
 ;
 
-declarator_array:
-  ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+init_declarator_list:
+  init_declarator                             { ast_manager_add_var_decl(&$$, $1); }
+| init_declarator COMMA init_declarator_list  { ast_manager_add_var_decl(&$3, $1); $$ = $3; }
+;
+
+init_declarator:
+  ID                                                        { $$ = add_var_declaration($1, vartype,  QUALIFIER_BASIC, NULL);  }
+| ID ASSIGN expr                                            { $$ = add_var_declaration($1, vartype,  QUALIFIER_BASIC, $3);  }
+| ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
 | ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
 | ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
 | ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { $$ = add_var_declaration($1, TYPE_STR, $3.value.i, NULL); }
 ;
 
-
-/* Declaração/definição de funções */
-
-declaration_func:
-  type_specifier ID func_paramlist DELI { $$ = function_settle2($2, $1, $3, NULL); }
-| type_specifier ID func_paramlist {funcname = $2; retvartype = $1; } func_block { $$ = function_settle2($2, $1, $3, $5); }
+declarator_func:
+  type_specifier ID { retvartype = $1; funcname = $2; } LPAR {
+	params_count = 0;
+	enter_scope();
+  }
+  opt_func_paramlist RPAR declarator_func_end {
+	if(add_function_declaration($2, $1) == -1){
+		exit(1);
+	}
+	$$ = ast_new_node(NODE_FUNC);
+	NodeData data;
+	data.lit = (Literal){.type = retvartype};
+	ast_add_child($$, $6);
+	ast_add_child($$, $8);
+	ast_set_data($$, data);
+	exit_scope();
+  }
 ;
 
 //um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
-// declaration_func_end:
-//   DELI        { function_definition = 0; $$ = ast_new_node(NODE_FUNC_BODY); }
-// | func_block  { function_definition = 1; $$ = ast_new_node(NODE_FUNC_BODY); if($1 != NULL){ ast_add_child($$, $1); } }
-// ;
-
-func_paramlist:
-  LPAR { params_count = 0; enter_scope(); } RPAR                   { $$ = ast_new_node(NODE_FUNC_PARAMLIST); }
-| LPAR { params_count = 0; enter_scope(); } func_paramlistZZZ RPAR { $$ = $3 ? $3 : ast_new_node(NODE_FUNC_PARAMLIST); }
+declarator_func_end:
+  DELI        { function_definition = 0; $$ = ast_new_node(NODE_FUNC_BODY); }
+| func_block  { function_definition = 1; $$ = ast_new_node(NODE_FUNC_BODY); if($1 != NULL){ ast_add_child($$, $1); } }
 ;
 
-func_paramlistZZZ:
+opt_func_paramlist:
+  %empty          { $$ = ast_new_node(NODE_FUNC_PARAMLIST); }
+| func_paramlist  { $$ = $1 ? $1 : ast_new_node(NODE_FUNC_PARAMLIST); }
+;
+
+func_paramlist:
   func_param {
     params_count++;
     if($1 != NULL){
@@ -316,7 +268,7 @@ func_paramlistZZZ:
       $$ = NULL;
     }
   }
-| func_param { params_count++; } COMMA func_paramlistZZZ {
+| func_param { params_count++; } COMMA func_paramlist {
     if($1 != NULL){
       ast_manager_add_param_decl(&$4, $1);
     }
@@ -325,23 +277,11 @@ func_paramlistZZZ:
 ;
 
 func_param:
-  func_param_basic { $$ = $1; }
-| func_param_array { $$ = $1; }
-;
-// | func_param_fp    { $$ = $1; }
-
-func_param_basic:
-  type_specifier    { $$ = NULL; }
-| type_specifier ID { $$ = add_var_declaration($2, vartype, QUALIFIER_BASIC, NULL); }
-;
-
-func_param_array:
-  type_specifier ID LBRACKET INTVAL RBRACKET { $$ = add_var_declaration($2, vartype, $4.value.i, NULL); }
-;
-
-func_param_fp:
-  type_specifier LPAR STAR RPAR LPAR func_paramlistZZZ RPAR    { $$ = NULL; } /* int (*)(...) */
-| type_specifier LPAR STAR ID RPAR LPAR func_paramlistZZZ RPAR { $$ = NULL; } /* int (*varname)(...) */
+  type_specifier                                            { $$ = NULL; }
+| type_specifier ID                                         { $$ = add_var_declaration($2, vartype, QUALIFIER_BASIC, NULL); }
+| type_specifier ID LBRACKET INTVAL RBRACKET                { $$ = add_var_declaration($2, vartype, $4.value.i, NULL); }
+| type_specifier LPAR STAR RPAR LPAR func_paramlist RPAR    { $$ = NULL; } /* int (*)(...) */
+| type_specifier LPAR STAR ID RPAR LPAR func_paramlist RPAR { $$ = NULL; } /* int (*varname)(...) */
 ;
 
 /* foi necessario criar um bloco que sirva como ponto de entrada de funções e
@@ -390,7 +330,7 @@ block_item_list:
 ;
 
 block_item:
-  declaration_var { $$ = $1; }
+  declarator_var { $$ = $1; }
 | stmt  { $$ = $1; }
 | block { $$ = $1; }
 ;
@@ -672,13 +612,13 @@ void parser_deinit(void){
 	stack_destroy(&block_defined_history, free);
 }
 
-void ast_manager_add_declaration(AST** program, AST* declaration){
-	static int declarations_defined = 0;
-	if(declarations_defined == 0){
+void ast_manager_add_declarator(AST** program, AST* declarator){
+	static int declarators_defined = 0;
+	if(declarators_defined == 0){
 		*program = ast_new_node(NODE_PROGRAM);
-		declarations_defined = 1;
+		declarators_defined = 1;
 	}
-	ast_add_child(*program, declaration); 
+	ast_add_child(*program, declarator); 
 }
 
 void ast_manager_add_var_decl(AST** varlist, AST* var){
