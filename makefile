@@ -6,11 +6,11 @@ lexername := mylexer
 lfile := $(srcdir)/src/lexer.l
 yfile := $(srcdir)/src/parser.y
 
-src := $(filter-out $(srcdir)/src/parser.c $(srcdir)/src/lexer.c,$(wildcard $(srcdir)/src/*.c))
-lib := $(wildcard $(srcdir)/lib/*.h)
+src := $(wildcard $(srcdir)/src/*/*.c)
+lib := $(wildcard $(srcdir)/lib/*/*.h)
 
 testcase := tests
-testfile := tests/OK/cp5/teste1.c
+testfile := tests/OK/ast/block1.c
 
 ##############################################
 
@@ -68,9 +68,6 @@ VALGRIND := valgrind
 VALGRINDFLAGS := --leak-check=full --show-leak-kinds=all -s
 
 all: prologue $(parsername) $(lexername)
-
-obj:
-	mkdir $@
 
 prologue:
 	@echo "bison input file: $(yfile)"

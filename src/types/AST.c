@@ -2,11 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "AST.h"
-#include "Function.h"
-#include "Literal.h"
-#include "Vector.h"
-#include "Scope.h"
+#include "types/AST.h"
+#include "types/Function.h"
+#include "types/Literal.h"
+#include "utils/Vector.h"
+#include "types/Scope.h"
 
 struct AST {
 	NodeKind kind;

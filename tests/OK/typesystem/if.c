@@ -21,11 +21,11 @@ int main(){
   }
 
 
-  /* int a = "a" + 1; */
-  /* char c = 'c'; */
-  // if(a + b + c){
-  //   printf("OKay lets go\n");
-  // }
+  int a = 1;
+  char c = 'c';
+  if(a + b + c){
+     printf("OKay lets go\n");
+  }
 
   return 0;
 }

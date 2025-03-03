@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "VarTable.h"
-#include "Literal.h"
-#include "Vector.h"
+#include "parser/VarTable.h"
+#include "types/Literal.h"
+#include "utils/Vector.h"
 
 struct VarTable {
 	Vector* t;
@@ -30,8 +30,7 @@ int vartable_add(
 	var->line = line;
 	var->qualifier = qualifier;
 	var->type = type;
-	vector_append(vt->t, var);
-	return 0;
+	return vector_append(vt->t, var);
 }
 
 Variable* vartable_search(VarTable* vt, const char* s) {

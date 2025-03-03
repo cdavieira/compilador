@@ -19,7 +19,7 @@ size_t vector_get_capacity(const Vector * const arr);
 void* vector_get_item(Vector* arr, size_t idx);
 
 void* vector_search(Vector* arr, void* item, int (*compare)(void*, void*));
-void vector_append(Vector* const arr, void* item);
+int vector_append(Vector* const arr, void* item);
 void* vector_pop(Vector* const arr);
 
 int vector_is_empty(const Vector * const arr);

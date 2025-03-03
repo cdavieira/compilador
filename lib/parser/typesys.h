@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Literal.h"
+#include "types/Literal.h"
 
 typedef enum Conversion {
     CONV_I2F,

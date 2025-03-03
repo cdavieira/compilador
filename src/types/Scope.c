@@ -1,6 +1,6 @@
-#include "Literal.h"
-#include "Scope.h"
-#include "VarTable.h"
+#include "types/Literal.h"
+#include "types/Scope.h"
+#include "parser/VarTable.h"
 
 #include <stdio.h>
 #include <malloc.h>
@@ -51,6 +51,10 @@ VarTable* scope_get_vartable(Scope* scope){
 
 Variable* scope_search_by_name(Scope* scope, const char* name){
 	return vartable_search(scope->vartable, name);
+}
+
+Variable* scope_get_var(Scope* scope, int idx){
+	return vartable_idx(scope->vartable, idx);
 }
 
 int scope_add(Scope* scope, char* name, int line, enum Type type, enum Qualifier qualifier){

@@ -1,4 +1,4 @@
-#include "Stack.h"
+#include "utils/Stack.h"
 #include <stdio.h> //printf
 #include <stdlib.h> //malloc, calloc, free, realloc
 #include <assert.h> //assert

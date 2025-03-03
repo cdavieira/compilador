@@ -1,4 +1,4 @@
-#include "typesys.h"
+#include "parser/typesys.h"
 #include <stdio.h>
 
 static const TypeData arith_table_lookup[][4] = {

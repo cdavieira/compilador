@@ -1,10 +1,10 @@
 #pragma once
 
 #include <stdarg.h>
-#include "Function.h"
-#include "Literal.h"
-#include "VarTable.h"
-#include "Scope.h"
+#include "types/Function.h"
+#include "types/Literal.h"
+#include "parser/VarTable.h"
+#include "types/Scope.h"
 
 typedef enum {
 	/* lang */

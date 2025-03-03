@@ -35,6 +35,7 @@ test_file(){
 		else
 			error_msg "$2 (expected to succeed)"
 		fi
+		echo ""
 		return $result
 	fi
 
@@ -63,6 +64,10 @@ test_dir(){
 	local testfiles=$(find $2 -type f -name "*.c")
 	local total="$(echo ${testfiles} | wc -w)"
 	local success=0
+	local failure_failure=0
+	local success_success=0
+	local success_failure=0
+	local failure_success=0
 	local fail=0
 	local expected=$3
 
@@ -77,22 +82,30 @@ test_dir(){
 		test_file $1 ${testfile} ${expected} $4 2>/dev/null
 		if [[ $? -eq 0 ]]; then
 			if [[ ${expected} -eq 0 ]]; then
+				# the test succeeded and we expected it to succeed
 				success=$((success+1))
+				success_success=$((success_success+1))
 			else
+				# the test succeeded but we expected it to fail
 				fail=$((fail+1))
+				success_failure=$((success_failure+1))
 			fi
 		else
 			if [[ ${expected} -eq 0 ]]; then
+				# the test failed and we expected it to succeed
 				fail=$((fail+1))
+				failure_success=$((failure_success+1))
 			else
+				# the test failed and we expected it to fail
+				failure_failure=$((failure_failure+1))
 				success=$((success+1))
 			fi
 		fi
 	done
 
 	warning_msg "\nTEST SUMMARY - $2"
-	echo -e "${RED}Fail${NC}: ${fail}/${total}"
-	echo -e "${GREEN}OK${NC}:   ${success}/${total}"
+	echo -e "${RED}Fail${NC}: ${fail}/${total}  (${failure_success} expected to succeed/${success_failure} expected to fail)"
+	echo -e "${GREEN}OK${NC}:   ${success}/${total} (${success_success} expected to succeed/${failure_failure} expected to fail)"
 }
 
 usage(){

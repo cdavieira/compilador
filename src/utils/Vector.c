@@ -1,4 +1,4 @@
-#include "Vector.h"
+#include "utils/Vector.h"
 #include <stdio.h> //printf
 #include <stdlib.h> //malloc, calloc, free, realloc
 #include <assert.h>
@@ -88,11 +88,13 @@ void* vector_search(Vector* arr, void* item, int (*compare)(void*, void*)){
 
 
 
-void vector_append(Vector* const arr, void* item){
+int vector_append(Vector* const arr, void* item){
 	if(vector_is_full(arr)){
 		vector_grow(arr, 1);
 	}
-	arr->elements[arr->size++] = item;
+	int idx = arr->size++;
+	arr->elements[idx] = item;
+	return idx;
 }
 
 void* vector_pop(Vector* const arr){

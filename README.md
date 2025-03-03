@@ -3,7 +3,7 @@ O projeto da disciplina de compiladores consiste em (adivinha só) construir um 
 
 
 ## Etapas para construção do compilador
-1. Desenvolvimento do lexer
+1. Desenvolvimento do lexer/scanner
 2. Desenvolvimento do parser
 3. Desenvolvimento da semântica da linguagem
 4. Desenvolvimento do sistema de tipos
@@ -48,3 +48,4 @@ Dicionário de termos usados no arquivo de configuração do bison (`parser/pars
 * [union declaration - bison](https://www.gnu.org/software/bison/manual/html_node/Union-Decl.html)
 * [token value - bison](https://www.gnu.org/software/bison/manual/html_node/Token-Values.html)
 * [type generation - bison](https://www.gnu.org/software/bison/manual/html_node/Type-Generation.html)
+* [lexical analysis - Wikipedia](https://en.wikipedia.org/wiki/Lexical_analysis)

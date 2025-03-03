@@ -3,7 +3,7 @@
 
 void parser_init();
 void parser_deinit();
-void parser_info();
+void parser_print();
 void lexer_init();
 void lexer_deinit();
 
@@ -15,7 +15,7 @@ int main(void) {
 		return -1;
 	}
 
-	parser_info();
+	parser_print();
 
 	parser_deinit();
 	lexer_deinit();

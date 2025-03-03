@@ -1,9 +1,9 @@
-#include "Literal.h"
-#include "Function.h"
-#include "Scope.h"
-#include "FuncTable.h"
-#include "VarTable.h"
-#include "Vector.h"
+#include "types/Literal.h"
+#include "types/Function.h"
+#include "types/Scope.h"
+#include "parser/FuncTable.h"
+#include "parser/VarTable.h"
+#include "utils/Vector.h"
 #include <malloc.h>
 
 
