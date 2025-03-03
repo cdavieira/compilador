@@ -32,7 +32,7 @@ CFLAGS := -Wall -I$(srcdir)/lib
 # Add debug information about the resulting type of each expression 
 # CFLAGS += -DDEBUG_EXPR_TYPE
 # Add debug information about the AST
-CFLAGS += -DDEBUG_AST
+# CFLAGS += -DDEBUG_AST
 
 flex_src := $(srcdir)/src/lexer.yy.c
 flex_hdr := $(srcdir)/lib/lexer.yy.h

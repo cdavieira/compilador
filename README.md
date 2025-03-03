@@ -32,7 +32,8 @@ Dicionário de termos usados no arquivo de configuração do bison (`parser/pars
 
 | palavra        | definição       |
 | -------------- | --------------- |
-| declarator     | declaracao de recursos que armazenam estado (variaveis e funcoes)                   |
+| declaration_var| linha unica do programa onde se declara 1 ou mais variaveis. A linha começa com o tipo das variaveis e continua com o **nome das variaveis** ou **declarators** |
+| declarator     | nome de uma variavel |
 | stmt           | comandos 'builtin' da linguagem (if, while, ...) + chamada de funcoes               |
 | block          | o bloco de definição de uma função, que pode ter stmts e declarators para variaveis |
 

@@ -11,9 +11,8 @@ separado e checar se ha algum conflito de nomes
 * [ ] investigar caso de teste 'tests/typesystem/if.c' (retorno da linha errado)
 * [ ] fazer ast arrays
 * [ ] corrigir leaks de memoria (cp5/block1.c)
-* [ ]
-
-```
-nc -l -p 5555
-nc 10.0.8.3 8080
-```
+* [ ] separar arquivos existentes no Literal.c
+* [ ] renomear funcoes do parser.y
+* [ ] de preferencia diminuir complexidade no funcionamento das funcoes do parser.y
+* [ ] de preferencia diminuir o numero de variaveis globais
+* [ ] fazer interpreatador minimalista

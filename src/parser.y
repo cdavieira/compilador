@@ -1,14 +1,5 @@
-/*
- * references
- * https://www.lysator.liu.se/c/ANSI-C-grammar-y.html
- * https://en.cppreference.com/w/c/language/constant_expression
- * https://en.cppreference.com/w/c/language/expressions
- */
-
-/* https://www.gnu.org/software/bison/manual/html_node/_0025define-Summary.html */
 %define parse.error verbose
 %define parse.lac full
-
 
 %{
 #include <stdio.h>
@@ -26,7 +17,6 @@
 #include "AST.h"
 
 extern int yylineno;
-int function_definition;
 int params_count;
 int fcall_active;
 char* funcname;
@@ -36,8 +26,6 @@ ScopeManager* scope_manager;
 FuncTable* functable;
 Vector* funcargs;
 AST* root;
-int varlist_defined;
-int paramlist_defined;
 int* block_defined;
 Stack* block_defined_history;
 
@@ -57,7 +45,7 @@ void check_var_declaration(char* name);
 Variable* get_var(char* name);
 void var_to_expr(char* name, Literal* exp);
 
-int add_function_declaration(char* name, enum Type type);
+int add_function_declaration(char* name, enum Type type, int definition);
 void check_function_declaration(char* name);
 int check_function_call(char* name);
 int check_function_return(enum Type rettype);
@@ -67,13 +55,13 @@ AST* binary_operation(
   TypeData (*operation)(enum Type, enum Type)
 );
 
-void check_if_while_condition(enum Type type);
+void check_condition(enum Type type);
 void check_assignment(char* name, AST* expr);
 
 void ast_manager_add_declaration(AST** declarations, AST* declaration);
-void ast_manager_add_var_decl(AST** varlist, AST* var);
-void ast_manager_add_param_decl(AST** paramlist, AST* param);
-void ast_manager_add_to_block(AST** block, AST* item);
+AST* ast_manager_add_var_decl(AST* varlist, AST* var, int create_varlist);
+AST* ast_manager_add_param_decl(AST* paramlist, AST* param, int create_paramlist);
+AST* ast_manager_add_to_block(AST* block, AST* item);
 AST* ast_manager_add_conv(AST* data, Conversion conv);
 AST* ast_manager_from_literal(Literal* lit);
 AST* ast_manager_from_id(char* name);
@@ -84,52 +72,67 @@ AST* ast_manager_while_stmt(AST* expr, AST* block);
 AST* ast_manager_add_funcret(AST* expr);
 AST* ast_manager_fcall(char* funcname);
 
-
-void function_prepare(char* name, enum Type type){
-  funcname = name;
-  retvartype = type;
-  // params_count = 0;
-  // enter_scope();
+void fcall_start(char* name, int check){
+    if(check){
+	    check_function_declaration(name);
+    }
+    vector_clear(funcargs);
+    fcall_active = 1;
 }
 
-AST* function_settle2(char *name, enum Type type, AST* params, AST* fblock){
-  function_definition = fblock == NULL ? 0 : 1;
-  if(add_function_declaration(name, type) == -1){
+void block_enter(void){
+    stack_push(block_defined_history, block_defined);
+    block_defined = calloc(1, sizeof(int));
+    enter_scope();
+}
+
+void block_exit(void){
+    free(block_defined);
+    block_defined = stack_pop(block_defined_history);
+    exit_scope();
+}
+
+void function_pre_body(char* name, enum Type type){
+  if(add_function_declaration(name, type, 0) == -1){
+    exit(1);
+  }
+  retvartype = type;
+  funcname = name;
+  *block_defined = 0;
+}
+
+void funcparams_begin(void){
+  params_count = 0;
+  enter_scope();
+}
+
+AST* function_settle(char *name, enum Type type, AST* params, AST* fblock){
+  int function_definition = fblock == NULL ? 0 : 1;
+  if(add_function_declaration(name, type, function_definition) == -1){
 	  exit(1);
   }
+
   AST* ast = ast_new_node(NODE_FUNC);
   AST* head = params != NULL ? params : ast_new_node(NODE_FUNC_PARAMLIST);
   AST* body = ast_new_node(NODE_FUNC_BODY); 
   if(fblock != NULL){
     ast_add_child(body, fblock);
   }
-  NodeData data;
-  data.lit = (Literal){.type = retvartype};
-  ast_add_child(ast, head);
-  ast_add_child(ast, body);
-  ast_set_data(ast, data);
-  exit_scope();
-  return ast;
-}
 
-AST* function_settle(char *name, enum Type type, AST* head, AST* body){
-  if(add_function_declaration(name, type) == -1){
-	  exit(1);
-  }
-  AST* ast = ast_new_node(NODE_FUNC);
   NodeData data;
   data.lit = (Literal){.type = retvartype};
   ast_add_child(ast, head);
   ast_add_child(ast, body);
   ast_set_data(ast, data);
+
   exit_scope();
+
   return ast;
 }
 
 %}
 
-/* Make 'union Token' definition available in 'parser.tab.h'
- * REF: https://www.gnu.org/software/bison/manual/html_node/Prologue-Alternatives.html */
+/* Make 'union Token' definition available in 'parser.tab.h' */
 %code requires {
 #include "Literal.h"
 #include "AST.h"
@@ -151,50 +154,120 @@ union Token {
 %token ASSIGN
 
 /* basic types */
-%token INT FLOAT CHAR VOID
-%token SHORT SIGNED DOUBLE UNSIGNED LONG
+%token VOID
+%token CHAR 
+%token FLOAT 
+%token INT 
+%token LONG
+%token UNSIGNED 
+%token DOUBLE 
+%token SIGNED 
+%token SHORT 
 
 /* pointer type/function type related */
-%token AMP INLINE RESTRICT RETURN STAR
+%token STAR
+%token RETURN 
+%token RESTRICT 
+%token INLINE 
+%token AMP 
 
 /* special types */
-%token ENUM STRUCT TYPEDEF UNION
+%token UNION
+%token TYPEDEF 
+%token STRUCT 
+%token ENUM 
 
 /* values */
-%token <l> CHR FLOATVAL INTVAL QUOTE STRING
+%token <l> FLOATVAL
+%token <l> INTVAL
+%token <l> QUOTE
+%token <l> STRING
+%token <l> CHR
 
 /* arithmetic operations */
-%token DIVISION MINUS MINUS1 MINUSAUTO PLUS PLUS1 PLUSAUTO MODULUS
+%token MODULUS
+%token PLUSAUTO 
+%token PLUS1 
+%token PLUS 
+%token MINUSAUTO 
+%token MINUS1 
+%token MINUS 
+%token DIVISION 
 
 /* logical operations */
-%token AND EQ GT GTEQ LT LTEQ NOT NOTEQ OR
+%token OR
+%token NOTEQ 
+%token NOT 
+%token LTEQ 
+%token LT 
+%token GTEQ 
+%token GT 
+%token EQ 
+%token AND 
 
 /* bitwise operations */
-%token BITANDAUTO BITNOT BITNOTAUTO BITOR BITORAUTO BITXOR BITXORAUTO LSHIFT LSHIFTAUTO RSHIFT RSHIFTAUTO
+%token RSHIFTAUTO
+%token RSHIFT 
+%token LSHIFTAUTO 
+%token LSHIFT 
+%token BITXORAUTO 
+%token BITXOR 
+%token BITORAUTO 
+%token BITOR 
+%token BITNOTAUTO 
+%token BITNOT 
+%token BITANDAUTO 
 
 /* type qualifier */
-%token AUTO CONST EXTERN REGISTER STATIC VOLATILE
+%token VOLATILE
+%token STATIC 
+%token REGISTER 
+%token EXTERN 
+%token CONST 
+%token AUTO 
 
 /* if else */
-%token IF ELSE
+%token ELSE
+%token IF 
 
 /* switch */
-%token CASE DEFAULT SWITCH
+%token SWITCH
+%token DEFAULT 
+%token CASE 
 
 /* loops */
-%token BREAK CONTINUE DO FOR WHILE
+%token WHILE
+%token FOR 
+%token DO 
+%token CONTINUE 
+%token BREAK 
 
 /* goto hell yeah */
 %token GOTO
 
 /* misc */
-%token LBRACKET LCURLY COMMA DELI RBRACKET RCURLY LPAR RPAR SIZEOF
-%token <str> PRINTF SCANF
+%token SIZEOF
+%token RPAR 
+%token LPAR 
+%token RCURLY 
+%token RBRACKET 
+%token DELI 
+%token COMMA 
+%token LCURLY 
+%token LBRACKET 
+%token <str> SCANF
+%token <str> PRINTF
 
-%left LT GT EQ NOTEQ
-%left AND OR
-%left PLUS MINUS
-%left STAR DIVISION
+%left GT
+%left EQ
+%left NOTEQ
+%left LT
+%left OR
+%left AND
+%left MINUS
+%left PLUS
+%left DIVISION
+%left STAR
 // %left MODULUS
 
 %nterm <str> fcaller
@@ -209,40 +282,23 @@ union Token {
 %nterm <ast> declarator_array
 %nterm <ast> declaration_func
 %nterm <ast> func_paramlist
-%nterm <ast> func_paramlistZZZ
+%nterm <ast> func_params
 %nterm <ast> func_param 
 %nterm <ast> func_param_basic
 %nterm <ast> func_param_array
 %nterm <ast> func_param_fp
-// %nterm <ast> declaration_func_end
-%nterm <ast> func_block
 %nterm <ast> block
-%nterm <ast> block_item_list
-%nterm <ast> block_item
+%nterm <ast> block_stmts
+%nterm <ast> block_stmt
 %nterm <ast> expr
 %nterm <ast> stmt
-%nterm <ast> assign_stmt
-%nterm <ast> if_stmt
-%nterm <ast> while_stmt
-%nterm <ast> jump_stmt
-%nterm <ast> fcall_stmt
+%nterm <ast> stmt_assign
+%nterm <ast> stmt_if
+%nterm <ast> stmt_while
+%nterm <ast> stmt_jump
+%nterm <ast> stmt_fcall
 %nterm <ast> fcall
 %%
-
-/* Recursos fora do escopo desse parser:
-  * struct
-  * enum
-  * union
-  * pointer
-  * for
-*/
-
-/* Dicionário
-  * declaration_var: linha unica do programa onde se declara 1 ou mais variaveis. A linha começa com o tipo das variaveis e continua com o **nome das variaveis** ou **declarators**
-  * declarator: nome de uma variavel
-  * stmt: comandos 'builtin' da linguagem (if, while, ...) + chamada de funcoes
-  * block: o bloco de definição de uma função, que pode ter stmts e declarations para variaveis
-*/
 
 program:
   declarations { root = $1; }
@@ -262,12 +318,12 @@ declaration:
 ;
 
 declaration_var:
-  type_specifier declarators DELI { $$ = $2; varlist_defined = 0; }
+  type_specifier declarators DELI { $$ = $2; }
 ;
 
 declarators:
-  declarator                    { ast_manager_add_var_decl(&$$, $1); }
-| declarator COMMA declarators  { ast_manager_add_var_decl(&$3, $1); $$ = $3; }
+  declarator                    { $$ = ast_manager_add_var_decl($$, $1, 1); }
+| declarator COMMA declarators  { $$ = ast_manager_add_var_decl($3, $1, 0); }
 ;
 
 declarator:
@@ -281,54 +337,36 @@ declarator_basic:
 ;
 
 declarator_array:
-  ID LBRACKET INTVAL RBRACKET                               { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY          { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY    { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
-| ID LBRACKET INTVAL RBRACKET ASSIGN STRING                 { $$ = add_var_declaration($1, TYPE_STR, $3.value.i, NULL); }
+  ID LBRACKET INTVAL RBRACKET                            { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY       { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
+| ID LBRACKET INTVAL RBRACKET ASSIGN STRING              { $$ = add_var_declaration($1, TYPE_STR, $3.value.i, NULL); }
 ;
 
 
 /* Declaração/definição de funções */
 
 declaration_func:
-  type_specifier ID func_paramlist DELI { $$ = function_settle2($2, $1, $3, NULL); }
-| type_specifier ID func_paramlist {funcname = $2; retvartype = $1; } func_block { $$ = function_settle2($2, $1, $3, $5); }
+  type_specifier ID func_paramlist DELI          { $$ = function_settle($2, $1, $3, NULL); }
+| type_specifier ID func_paramlist LCURLY RCURLY { $$ = function_settle($2, $1, $3, NULL); }
+| type_specifier ID func_paramlist LCURLY { function_pre_body($2, $1); } block_stmts RCURLY { $$ = function_settle($2, $1, $3, $6); }
 ;
-
-//um pouco criminoso, mas foi necessario para evitar conflitos de shift e reduce
-// declaration_func_end:
-//   DELI        { function_definition = 0; $$ = ast_new_node(NODE_FUNC_BODY); }
-// | func_block  { function_definition = 1; $$ = ast_new_node(NODE_FUNC_BODY); if($1 != NULL){ ast_add_child($$, $1); } }
-// ;
 
 func_paramlist:
-  LPAR { params_count = 0; enter_scope(); } RPAR                   { $$ = ast_new_node(NODE_FUNC_PARAMLIST); }
-| LPAR { params_count = 0; enter_scope(); } func_paramlistZZZ RPAR { $$ = $3 ? $3 : ast_new_node(NODE_FUNC_PARAMLIST); }
+  LPAR { funcparams_begin(); } RPAR             { $$ = NULL; }
+| LPAR { funcparams_begin(); } func_params RPAR { $$ = $3; }
 ;
 
-func_paramlistZZZ:
-  func_param {
-    params_count++;
-    if($1 != NULL){
-      ast_manager_add_param_decl(&$$, $1);
-    }
-    else{
-      $$ = NULL;
-    }
-  }
-| func_param { params_count++; } COMMA func_paramlistZZZ {
-    if($1 != NULL){
-      ast_manager_add_param_decl(&$4, $1);
-    }
-    $$ = $4 ? $4 : NULL;
-  }
+func_params:
+  func_param                   { $$ = ast_manager_add_param_decl($$, $1, 1); }
+| func_param COMMA func_params { $$ = ast_manager_add_param_decl($3, $1, 0); }
 ;
 
 func_param:
   func_param_basic { $$ = $1; }
 | func_param_array { $$ = $1; }
+| func_param_fp    { $$ = $1; }
 ;
-// | func_param_fp    { $$ = $1; }
 
 func_param_basic:
   type_specifier    { $$ = NULL; }
@@ -340,93 +378,63 @@ func_param_array:
 ;
 
 func_param_fp:
-  type_specifier LPAR STAR RPAR LPAR func_paramlistZZZ RPAR    { $$ = NULL; } /* int (*)(...) */
-| type_specifier LPAR STAR ID RPAR LPAR func_paramlistZZZ RPAR { $$ = NULL; } /* int (*varname)(...) */
+  type_specifier LPAR STAR RPAR LPAR func_params RPAR    { $$ = NULL; } /* int (*)(...) */
+| type_specifier LPAR STAR ID RPAR LPAR func_params RPAR { $$ = NULL; } /* int (*varname)(...) */
 ;
-
-/* foi necessario criar um bloco que sirva como ponto de entrada de funções e
- * que não crie um novo escopo para a função (isso já é feito ao criar o escopo
- * da lista de argumentos) */
-func_block:
-  LCURLY RCURLY { $$ = NULL; *block_defined = 0; }
-| LCURLY {
-    function_definition = 0;
-    if(add_function_declaration(funcname, retvartype) == -1){
-
-    }
-    function_definition = 1;
-    *block_defined = 0;
-  } block_item_list RCURLY {
-    $$ = $3;
-  }
 
 block:
   LCURLY RCURLY { $$ = NULL; }
-| LCURLY {
-    stack_push(block_defined_history, block_defined);
-    block_defined = calloc(1, sizeof(int));
-    enter_scope();
-  } block_item_list RCURLY {
-    $$ = $3;
-    free(block_defined);
-    block_defined = stack_pop(block_defined_history);
-    exit_scope();
-  }
+| LCURLY { block_enter(); } block_stmts RCURLY { block_exit(); $$ = $3; }
 ;
 
-block_item_list:
-  block_item {
-    if($1)
-      ast_manager_add_to_block(&$$, $1);
-    else
-      $$ = NULL;
-  }
-| block_item_list block_item {
-    if($2){
-      ast_manager_add_to_block(&$1, $2);
-    }
-    $$ = $1 ? $1 : NULL;
-  }
+block_stmts:
+  block_stmt             { $$ = $1 ? ast_manager_add_to_block($$, $1) : NULL ; }
+| block_stmts block_stmt { $$ = ast_manager_add_to_block($1, $2); }
 ;
 
-block_item:
+block_stmt:
   declaration_var { $$ = $1; }
 | stmt  { $$ = $1; }
 | block { $$ = $1; }
 ;
 
 stmt:
-  assign_stmt { $$ = $1; }
-| if_stmt     { $$ = $1; }
-| while_stmt  { $$ = $1; }
-| jump_stmt   { $$ = $1; }
-| fcall_stmt  { $$ = $1; }
+  stmt_assign { $$ = $1; }
+| stmt_if     { $$ = $1; }
+| stmt_while  { $$ = $1; }
+| stmt_jump   { $$ = $1; }
+| stmt_fcall  { $$ = $1; }
 ;
 
-jump_stmt:
+stmt_jump:
   CONTINUE DELI      { $$ = NULL; }
 | BREAK DELI         { $$ = NULL; }
-| RETURN DELI        { check_function_return(TYPE_VOID); $$ = ast_manager_add_funcret(NULL); }
-| RETURN expr DELI   { check_function_return(ast_get_type($2));  $$ = ast_manager_add_funcret($2); }
+| RETURN DELI        { $$ = ast_manager_add_funcret(NULL); }
+| RETURN expr DELI   { $$ = ast_manager_add_funcret($2); }
 ;
 
-while_stmt:
-  WHILE LPAR expr RPAR block   { check_if_while_condition(ast_get_type($3)); $$ = ast_manager_while_stmt($3, $5); }
+stmt_while:
+  WHILE LPAR expr RPAR block { $$ = ast_manager_while_stmt($3, $5); }
 ;
 
-if_stmt:
-  IF LPAR expr RPAR block              { check_if_while_condition(ast_get_type($3)); $$ = ast_manager_if_stmt($3, $5, NULL); }
-| IF LPAR expr RPAR block ELSE block   { check_if_while_condition(ast_get_type($3)); $$ = ast_manager_if_stmt($3, $5, $7); }
-| IF LPAR expr RPAR block ELSE if_stmt { check_if_while_condition(ast_get_type($3)); $$ = ast_manager_if_stmt($3, $5, $7); }
+stmt_if:
+  IF LPAR expr RPAR block              { $$ = ast_manager_if_stmt($3, $5, NULL); }
+| IF LPAR expr RPAR block ELSE block   { $$ = ast_manager_if_stmt($3, $5, $7); }
+| IF LPAR expr RPAR block ELSE stmt_if { $$ = ast_manager_if_stmt($3, $5, $7); }
 ;
 
-assign_stmt:
-  ID ASSIGN expr DELI                          { check_var_declaration($1); check_assignment($1, $3); $$ = ast_manager_assign_stmt($1, $3); }
-| ID LBRACKET expr RBRACKET ASSIGN expr DELI   { check_var_declaration($1); check_assignment($1, $3); $$ = ast_manager_assign_stmt_arr($1, $3, $6); }
+stmt_assign:
+  ID ASSIGN   expr DELI                      { $$ = ast_manager_assign_stmt($1, $3); }
+| ID LBRACKET expr RBRACKET ASSIGN expr DELI { $$ = ast_manager_assign_stmt_arr($1, $3, $6); }
 ;
 
-fcall_stmt:
+stmt_fcall:
   fcall DELI { $$ = $1; }
+;
+
+fcall:
+  fcaller LPAR RPAR         { $$ = ast_manager_fcall($1); }
+| fcaller LPAR exprs RPAR   { $$ = ast_manager_fcall($1); }
 ;
 
 expr:
@@ -455,15 +463,10 @@ expr:
 | ID LBRACKET expr RBRACKET { check_var_declaration($1); $$ = NULL; } //TODO: improve this
 ;
 
-fcall:
-  fcaller LPAR RPAR         { check_function_call($1); fcall_active = 0; $$ = ast_manager_fcall($1); }
-| fcaller LPAR exprs RPAR   { check_function_call($1); fcall_active = 0; $$ = ast_manager_fcall($1); }
-;
-
 fcaller:
-  ID      { check_function_declaration($1); vector_clear(funcargs); fcall_active = 1; $$ = $1; }
-| PRINTF  { vector_clear(funcargs); fcall_active = 1; $$ = $1; }
-| SCANF   { vector_clear(funcargs); fcall_active = 1; $$ = $1; }
+  ID      { fcall_start($1, 1); $$ = $1; }
+| PRINTF  { fcall_start($1, 0); $$ = $1; }
+| SCANF   { fcall_start($1, 0); $$ = $1; }
 ;
 
 exprs:
@@ -471,7 +474,6 @@ exprs:
 | expr { if(fcall_active == 1){ vector_append(funcargs, $1) ; }; } COMMA exprs
 ;
 
-/* WARNING: o tipo void deverá ser tratado durante a analise semântica: NÂO permitir a declaração de variáveis desse tipo. */
 type_specifier:
   INT     { vartype = TYPE_INT;  $$ = vartype; }
 | CHAR    { vartype = TYPE_CHAR; $$ = vartype; }
@@ -542,10 +544,10 @@ Variable* get_var(char* name){
 	return scope_search_by_name(scope, name);
 }
 
-int add_function_declaration(char* name, enum Type type){
+int add_function_declaration(char* name, enum Type type, int definition){
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
-	if(func_table_add(functable, name, scope, type, params_count, function_definition) == -1){
-		if(function_definition){
+	if(func_table_add(functable, name, scope, type, params_count, definition) == -1){
+		if(definition){
 			printf("SEMANTIC ERROR (%d): function %s has been defined already\n", yylineno, name);
 			return -1;
 		}
@@ -606,7 +608,7 @@ int check_function_return(enum Type rettype){
 	return 0;
 }
 
-void check_if_while_condition(enum Type type){
+void check_condition(enum Type type){
 	switch(type){
 		case TYPE_INT:
 			break;
@@ -681,28 +683,34 @@ void ast_manager_add_declaration(AST** program, AST* declaration){
 	ast_add_child(*program, declaration); 
 }
 
-void ast_manager_add_var_decl(AST** varlist, AST* var){
-	if(varlist_defined == 0){
-		*varlist = ast_new_node(NODE_VAR_LIST);
-		varlist_defined = 1;
+AST* ast_manager_add_var_decl(AST* varlist, AST* var, int create_varlist){
+	if(create_varlist == 1){
+		varlist = ast_new_node(NODE_VAR_LIST);
 	}
-	ast_add_child(*varlist, var); 
+	ast_add_child(varlist, var); 
+	return varlist;
 }
 
-void ast_manager_add_param_decl(AST** paramlist, AST* param){
-	if(paramlist_defined == 0){
-		*paramlist = ast_new_node(NODE_FUNC_PARAMLIST);
-		paramlist_defined = 1;
+AST* ast_manager_add_param_decl(AST* paramlist, AST* param, int create_paramlist){
+	if(create_paramlist == 1){
+		paramlist = ast_new_node(NODE_FUNC_PARAMLIST);
 	}
-	ast_add_child(*paramlist, param); 
+	params_count++;
+	if(param){
+		ast_add_child(paramlist, param); 
+	}
+	return paramlist;
 }
 
-void ast_manager_add_to_block(AST** block, AST* item){
+AST* ast_manager_add_to_block(AST* block, AST* item){
 	if(*block_defined == 0){
-		*block = ast_new_node(NODE_BLOCK);
+		block = ast_new_node(NODE_BLOCK);
 		*block_defined = 1;
 	}
-	ast_add_child(*block, item); 
+	if(item){
+		ast_add_child(block, item); 
+	}
+	return block;
 }
 
 AST* ast_manager_add_conv(AST* raw, Conversion conv){
@@ -787,6 +795,9 @@ AST* ast_manager_from_id(char* name){
 }
 
 AST* ast_manager_assign_stmt(char* name, AST* expr){
+	check_var_declaration(name);
+	check_assignment(name, expr); 
+
 	AST* stmt = ast_new_node(NODE_ASSIGN);
 	AST* var = ast_manager_from_id(name);
 	NodeData data;
@@ -799,6 +810,9 @@ AST* ast_manager_assign_stmt(char* name, AST* expr){
 
 
 AST* ast_manager_fcall(char* funcname){
+	check_function_call(funcname);
+	fcall_active = 0; 
+
 	AST* node  = ast_new_node(NODE_FCALL);
 	NodeData data;
 	Function* f = func_table_search(functable, funcname);
@@ -812,6 +826,9 @@ AST* ast_manager_fcall(char* funcname){
 }
 
 AST* ast_manager_if_stmt(AST* expr, AST* ifblock, AST* elseblock){
+	enum Type type = ast_get_type(expr);
+	check_condition(type); 
+
 	AST* node  = ast_new_node(NODE_IF);
 	ast_add_child(node, expr);
 	if(ifblock != NULL){
@@ -824,6 +841,9 @@ AST* ast_manager_if_stmt(AST* expr, AST* ifblock, AST* elseblock){
 }
 
 AST* ast_manager_while_stmt(AST* expr, AST* block){
+	enum Type type = ast_get_type(expr);
+	check_condition(type); 
+
 	AST* node  = ast_new_node(NODE_WHILE);
 	if(expr != NULL){
 		ast_add_child(node, expr);	
@@ -831,10 +851,14 @@ AST* ast_manager_while_stmt(AST* expr, AST* block){
 	if(block != NULL){
 		ast_add_child(node, block);
 	}
+
 	return node;
 }
 
 AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
+	check_var_declaration(name);
+	check_assignment(name, val); 
+
 	AST* stmt = ast_new_node(NODE_ASSIGN);
 	AST* var = ast_manager_from_id(name);
 	NodeData data;
@@ -847,13 +871,17 @@ AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
 }
 
 AST* ast_manager_add_funcret(AST* expr){
+	enum Type type = expr == NULL ? TYPE_VOID : ast_get_type(expr);
+	check_function_return(type);
+
 	AST* stmt = ast_new_node(NODE_FUNC_RET);
 	if(expr != NULL){
 		ast_add_child(stmt, expr);
 	}
 	NodeData data;
-	data.lit.type = expr == NULL ? TYPE_VOID : ast_get_type(expr);
+	data.lit.type = type;
 	ast_set_data(stmt, data);
+
 	return stmt;
 }
 
