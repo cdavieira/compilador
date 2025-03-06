@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "parser/VarTable.h"
-#include "types/Literal.h"
 #include "utils/Vector.h"
 
 struct VarTable {
@@ -20,7 +19,8 @@ int vartable_add(
 	char* s,
 	int line,
 	enum Type type,
-	enum Qualifier qualifier)
+	enum Qualifier qualifier,
+	unsigned addr)
 {
 	Variable* var = malloc(sizeof(Variable));
 	if(var == NULL){
@@ -30,6 +30,7 @@ int vartable_add(
 	var->line = line;
 	var->qualifier = qualifier;
 	var->type = type;
+	var->addr = addr;
 	return vector_append(vt->t, var);
 }
 

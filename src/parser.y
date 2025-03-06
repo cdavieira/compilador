@@ -47,6 +47,9 @@ AST* root;
 int* ast_block;
 Stack* ast_block_history;
 
+//count of how many variables and funcparams have been created so far in this program.
+unsigned var_count;
+
 /* bison internals */
 int yylex(void);
 void yyerror(char const *s);
@@ -530,7 +533,7 @@ AST* add_var_declaration(char* name, enum Type type, enum Qualifier qualifier, A
 	}
 
 	Scope* scope = scope_manager_get_current_scope(scope_manager);
-	int idx = scope_add(scope, name, yylineno, type, qualifier);
+	int idx = scope_add(scope, name, yylineno, type, qualifier, var_count++);
 	int var_exists = idx == -1;
 	Variable* var = var_exists ? scope_search_by_name(scope, name) : scope_get_var(scope, idx);
 
@@ -623,7 +626,7 @@ void check_function_call(char* name){
 		param = vartable_idx(vt, i);
 		arg = vector_get_item(funcargs, i);
 		if(ast_get_type(arg) != param->type){
-			fprintf(stdout, "TYPE ERROR (%d); function %s called with argument of wrong type; '%s' should be '%s'\n", yylineno, name, type_name(ast_get_type(arg)), type_name(param->type));
+			fprintf(stdout, "TYPE ERROR (%d): function %s called with argument of wrong type: '%s' should be '%s'\n", yylineno, name, type_name(ast_get_type(arg)), type_name(param->type));
 			exit(1);
 		}
 	}
@@ -631,7 +634,7 @@ void check_function_call(char* name){
 
 void check_function_return(enum Type rettype){
 	if(retvartype != rettype){
-		fprintf(stdout, "TYPE ERROR (%d); function %s with wrong return type; '%s' should be '%s'\n", yylineno, funcname, type_name(rettype), type_name(retvartype));
+		fprintf(stdout, "TYPE ERROR (%d): function %s with wrong return type: '%s' should be '%s'\n", yylineno, funcname, type_name(rettype), type_name(retvartype));
 		exit(1);
 	}
 }

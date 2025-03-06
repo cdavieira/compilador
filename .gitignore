@@ -10,3 +10,6 @@ lexer.yy.c
 parser.tab.h
 lexer.yy.h
 Session.vim
+ezlang/parser.h
+ezlang/parser.c
+ezlang/scanner.c

@@ -1,3 +1,4 @@
+
 { Sample program in EZ language -
   silly program to handle some corner cases.
 }
@@ -7,20 +8,22 @@ var
     int xxxx;
     int yyy;
     int longidentifier;
-		string sabao;
+    string sabao;
 begin
     write "Silly program.\n";
     write 4 + 3 * 2;
     write "Silly program.\n";
-    write "Silly \"program.\n";
+    write "Silly program.\n";
     xxxx := 4;
     longidentifier := 4;
-		if 1 + 1 then write "Sab"; end
-		if 1 + 1 = 2 then write "Sab"; end
+    if 1 + 1 = 2 then write "Sab"; end
+    if 1 + 1 = 2 then write "Sab"; end
+    if 1 + yyy = 2 then write "Sabss"; end
+    if yyy + yyy = 2 then write "Sabss"; end
     yyy := longidentifier;
-		sabao := "sabao" + "vermelho";
-		sabao := "sabao" + 1;
-		sabao := 1.5 + "vermelho";
-		sabao := true + "vermelho";
+    sabao := "sabao" + "vermelho";
+    sabao := "sabao" + 1;
+    sabao := 1.5 + "vermelho";
+    sabao := true + "vermelho";
     write (xxxx * yyy) / longidentifier;
 end

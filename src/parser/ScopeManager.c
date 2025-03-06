@@ -26,6 +26,8 @@ static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name);
 //static int scope_manager_search_recursive(
 //	ScopeManager* manager, Scope* scope, Variable* search);
+size_t scope_manager_get_symbol_count_recursive(
+    ScopeManager* manager, Scope* scope, size_t res);
 
 ScopeManager* scope_manager_new(void){
 	ScopeManager* manager = malloc(sizeof(ScopeManager));

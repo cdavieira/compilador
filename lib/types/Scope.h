@@ -14,6 +14,12 @@ int scope_get_level(Scope* scope);
 VarTable* scope_get_vartable(Scope* scope);
 Variable* scope_get_var(Scope* scope, int idx);
 
-int scope_add(Scope* scope, char* name, int line, enum Type type, enum Qualifier qualifier);
+int scope_add(
+    Scope* scope,
+    char* name,
+    int line,
+    enum Type type,
+    enum Qualifier qualifier,
+    unsigned addr);
 Variable* scope_search_by_name(Scope* scope, const char* name);
 Variable* scope_search(Scope* scope, Variable* search);

@@ -17,6 +17,7 @@
 
 static Vector* tokens;
 
+static int mystrcmp(void* s1, void* s2);
 static char* alloc_str(char* src);
 static void save_id(void);
 static void save_string(void);
@@ -143,9 +144,16 @@ void lexer_deinit(void){
 	vector_destroy(&tokens, free);
 }
 
+static int mystrcmp(void* s1, void* s2){
+	return strcmp((char*)s1, (char*)s2) == 0;
+}
+
 static char* alloc_str(char* src){
-	char* string = strdup(src);
-	vector_append(tokens, string);
+	char* string = vector_search(tokens, src, mystrcmp);
+	if(string == NULL){
+		string = strdup(src);
+		vector_append(tokens, string);
+	}
 	return string;
 }
 

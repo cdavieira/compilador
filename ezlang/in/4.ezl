@@ -1,0 +1,13 @@
+{ Sample program in EZ language -
+  silly program to handle some corner cases.
+}
+
+program silly;
+var
+    int xxxx;
+    int yyy;
+    int longidentifier;
+    string sabao;
+begin
+    xxxx := 4 + 1;
+end

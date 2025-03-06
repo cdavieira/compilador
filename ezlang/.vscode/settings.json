@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "vector.h": "c",
-        "random": "cpp",
-        "stdexcept": "cpp",
-        "functional": "cpp",
-        "type_traits": "cpp"
-    }
-}

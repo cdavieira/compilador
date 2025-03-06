@@ -1,14 +1,15 @@
+
 all: bison flex gcc
 	@echo "Done."
 
-bison: src/parser.y
-	bison  -o src/parser.c -Wcounterexamples --header=lib/parser.h --debug $<
+bison: parser.y
+	bison parser.y
 
-flex: src/scanner.l
-	flex -o src/scanner.c --header-file=lib/scanner.h $<
+flex: scanner.l
+	flex scanner.l
 
-gcc: src/scanner.c src/parser.c $(wildcard src/*.c)
-	gcc -Wall -Ilib $^
+gcc: scanner.c parser.c tables.c types.c ast.c interpreter.c
+	gcc -Wall -Wconversion -o lab06 scanner.c parser.c tables.c types.c ast.c interpreter.c
 
 clean:
-	@rm -f *.o *.output src/scanner.c lib/parser.h src/parser.c a.out
+	@rm -f *.o *.output scanner.c parser.h parser.c *.dot *.pdf lab06 out/*.out out/*.dot out/*.pdf

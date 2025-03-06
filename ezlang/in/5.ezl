@@ -1,0 +1,6 @@
+program silly;
+var
+    bool y;
+begin
+    if false then write "Sab"; else y := false ; end
+end

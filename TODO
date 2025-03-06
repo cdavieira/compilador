@@ -5,3 +5,4 @@
 * [ ] de preferencia diminuir complexidade no funcionamento das funcoes do parser.y
 * [ ] de preferencia diminuir o numero de variaveis globais
 * [ ] fazer interpreatador minimalista
+* [ ] como ficam os parametros que sao passados por registrador? eles ainda são escritos na memoria virtual?

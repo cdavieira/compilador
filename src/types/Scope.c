@@ -49,20 +49,27 @@ VarTable* scope_get_vartable(Scope* scope){
 	return scope->vartable;
 }
 
-Variable* scope_search_by_name(Scope* scope, const char* name){
-	return vartable_search(scope->vartable, name);
-}
-
 Variable* scope_get_var(Scope* scope, int idx){
 	return vartable_idx(scope->vartable, idx);
 }
 
-int scope_add(Scope* scope, char* name, int line, enum Type type, enum Qualifier qualifier){
+int scope_add(
+    Scope* scope,
+    char* name,
+    int line,
+    enum Type type,
+    enum Qualifier qualifier,
+    unsigned addr)
+{
 	if(scope_search_by_name(scope, name) != NULL){
 		return -1;
 	}
 
 	//printf("Adding new variable '%s' to scope %d\n", name, scope->id);
 
-	return vartable_add(scope->vartable, name, line, type, qualifier);
+	return vartable_add(scope->vartable, name, line, type, qualifier, addr);
+}
+
+Variable* scope_search_by_name(Scope* scope, const char* name){
+	return vartable_search(scope->vartable, name);
 }
