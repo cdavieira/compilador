@@ -3,7 +3,6 @@
 #include <stdarg.h>
 #include "types/Function.h"
 #include "types/Literal.h"
-#include "parser/VarTable.h"
 #include "types/Scope.h"
 
 typedef enum {
@@ -28,6 +27,7 @@ typedef enum {
 	NODE_OVER,
 	NODE_PLUS,
 	NODE_TIMES,
+	NODE_MOD,
 	NODE_LT,
 	NODE_GT,
 	NODE_EQ,

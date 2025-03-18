@@ -133,6 +133,7 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_NE:
 		case NODE_OR:
 		case NODE_AND:
+		case NODE_MOD:
 			node->type = data.lit.type;
 			node->data = data;
 			node->has_data = 1;
@@ -186,6 +187,7 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_OVER:         return "over";
 		case NODE_PLUS:         return "plus";
 		case NODE_TIMES:        return "times";
+		case NODE_MOD:        return "modulus";
 		case NODE_LT:           return "lt"; 
 		case NODE_GT:           return "gt"; 
 		case NODE_EQ:           return "eq"; 
@@ -235,6 +237,7 @@ int ast_has_literal(AST* node) {
 		case NODE_NE:
 		case NODE_OR:
 		case NODE_AND:
+		case NODE_MOD:
 		    return 1;
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
@@ -301,6 +304,7 @@ int ast_has_var(AST* node) {
 		case NODE_FUNC_BODY:
 		case NODE_FCALL:
 		case NODE_FUNC_RET:
+		case NODE_MOD:
 			break;
 	}
 	return 0;
@@ -327,6 +331,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_NE:
 		case NODE_OR:
 		case NODE_AND:
+		case NODE_MOD:
 			return &node->data.lit;
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:

@@ -41,7 +41,7 @@ test_file(){
 
 	# test == 0, then the test succeeded
 	if [[ $3 -eq 0 ]]; then
-		# if $3 -= 0, then the expectation was for the test to succeed
+		# if $3 == 0, then the expectation was for the test to succeed
 		success_msg "$2 (expected to succeed)"
 	else
 		error_msg "$2 (expected to fail)"

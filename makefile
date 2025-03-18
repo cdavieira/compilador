@@ -100,7 +100,7 @@ val:
 
 
 test: clean all
-	@./test -p./$(parsername) $(testcase)
+	@./test.sh -p./$(parsername) $(testcase)
 
 clean:
 	@rm -f $(parsername)

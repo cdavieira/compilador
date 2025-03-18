@@ -236,7 +236,7 @@ union Token {
 %left PLUS
 %left DIVISION
 %left STAR
-// %left MODULUS
+%left MODULUS
 
 %nterm <str> fcaller
 %nterm <t> type_specifier
@@ -412,10 +412,11 @@ expr:
 | FLOATVAL                  { $$ = ast_manager_from_literal(&$1); }
 | STRING                    { $$ = ast_manager_from_literal(&$1); }
 | CHR                       { $$ = ast_manager_from_literal(&$1); }
-| expr PLUS expr            { $$ = ast_manager_binop($1, $3, NODE_PLUS, typesys_sum);   }
+| expr PLUS expr            { $$ = ast_manager_binop($1, $3, NODE_PLUS, typesys_sum);  }
 | expr MINUS expr           { $$ = ast_manager_binop($1, $3, NODE_MINUS, typesys_sub); }
 | expr STAR expr            { $$ = ast_manager_binop($1, $3, NODE_TIMES, typesys_mul); }
 | expr DIVISION expr        { $$ = ast_manager_binop($1, $3, NODE_OVER, typesys_div);  }
+| expr MODULUS expr         { $$ = ast_manager_binop($1, $3, NODE_MOD, typesys_mod);   }
 | expr OR expr              { $$ = ast_manager_binop($1, $3, NODE_OR, typesys_or);   }
 | expr AND expr             { $$ = ast_manager_binop($1, $3, NODE_AND, typesys_and); }
 | expr EQ expr              { $$ = ast_manager_binop($1, $3, NODE_EQ, typesys_eq);   }
@@ -606,9 +607,14 @@ void check_function_call(char* name){
 #undef STRING_EQ
 	Function* f = func_table_search(functable, name);
 	if(f == NULL){
-		fprintf(stdout, "SEMANTIC ERROR (%d); function %s does not exist\n", yylineno, name);
+		fprintf(stdout, "SEMANTIC ERROR (%d): function %s does not exist\n", yylineno, name);
 		exit(1);
 	}
+
+	// if(func_is_defined(f) == 0){
+	// 	fprintf(stdout, "SEMANTIC ERROR (%d): function %s isn't defined\n", yylineno, name);
+	// 	exit(1);
+	// }
 
 	Scope* scope = func_get_scope(f);
 	VarTable* vt = scope_get_vartable(scope);
@@ -618,7 +624,7 @@ void check_function_call(char* name){
 	AST* arg = NULL;
 	
 	if(nargs != nparams){
-		fprintf(stdout, "TYPE ERROR (%d); function %s called with insufficient number of arguments\n", yylineno, name);
+		fprintf(stdout, "TYPE ERROR (%d): function %s called with insufficient number of arguments\n", yylineno, name);
 		exit(1);
 	}
 

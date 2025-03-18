@@ -22,6 +22,13 @@ static const TypeData assign_table_lookup[][4] = {
 	{{TYPE_VOID,}, {TYPE_CHAR,CONV_NONE,CONV_I2C}, {TYPE_FLT,CONV_NONE,CONV_C2F},  {TYPE_INT,CONV_NONE,CONV_C2I}},
 }; 
 
+static const TypeData modulus_table_lookup[][4] = {
+	{{TYPE_VOID,}, {TYPE_VOID,}, {TYPE_VOID,}, {TYPE_VOID,}},
+	{{TYPE_VOID,}, {TYPE_INT,CONV_NONE,CONV_NONE}, {TYPE_VOID,},  {TYPE_INT,CONV_NONE,CONV_C2I}},
+	{{TYPE_VOID,}, {TYPE_VOID,},  {TYPE_VOID,}, {TYPE_VOID,}},
+	{{TYPE_VOID,}, {TYPE_INT,CONV_C2I,CONV_NONE}, {TYPE_VOID,},  {TYPE_INT,CONV_C2I,CONV_C2I}},
+}; 
+
 #define PRINT_EXPR(l1, l2, op) \
 	printf("Expression type debug: %s %s %s = ...\n", \
 		type_name(l1), \
@@ -54,6 +61,13 @@ const TypeData typesys_div(enum Type op1, enum Type op2){
 	PRINT_EXPR(op1, op2, /);
 #endif
 	return arith_table_lookup[op1][op2];
+}
+
+const TypeData typesys_mod(enum Type op1, enum Type op2){
+#ifdef DEBUG_EXPR_TYPE
+	PRINT_EXPR(op1, op2, %);
+#endif
+	return modulus_table_lookup[op1][op2];
 }
 
 const TypeData typesys_lt(enum Type op1, enum Type op2){

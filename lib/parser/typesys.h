@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types/Literal.h"
+#include "types/Type.h"
 
 typedef enum Conversion {
     CONV_I2F,
@@ -22,6 +22,7 @@ const TypeData typesys_sum(enum Type t1, enum Type t2);
 const TypeData typesys_sub(enum Type t1, enum Type t2);
 const TypeData typesys_mul(enum Type t1, enum Type t2);
 const TypeData typesys_div(enum Type t1, enum Type t2);
+const TypeData typesys_mod(enum Type op1, enum Type op2);
 const TypeData typesys_and(enum Type t1, enum Type t2);
 const TypeData typesys_or(enum Type t1, enum Type t2);
 const TypeData typesys_lt(enum Type t1, enum Type t2);
