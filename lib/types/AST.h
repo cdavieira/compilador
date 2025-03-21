@@ -1,9 +1,11 @@
 #pragma once
 
 #include <stdarg.h>
+#include <stdio.h>
 #include "types/Function.h"
 #include "types/Literal.h"
 #include "types/Scope.h"
+#include "types/Variable.h"
 
 typedef enum {
 	/* lang */
@@ -92,7 +94,8 @@ void ast_add_child(AST *parent, AST *child);
 int ast_has_literal(AST* node);
 int ast_has_var(AST* node);
 Literal* ast_get_literal(AST* node);
+Variable* ast_get_variable(AST* node);
 
 char* ast_kind2str(NodeKind kind);
-void print_dot(AST *ast);
+void ast_export_dot(AST *ast, FILE* fpout);
 void ast_print(AST* ast);

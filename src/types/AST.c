@@ -18,10 +18,11 @@ struct AST {
 };
 
 
+static FILE* fdump;
 
 static void ast_print_rec(AST* ast, int parent);
 
-static void print_node_dot(AST *node);
+static void ast_export_dot_rec(AST *node);
 
 
 
@@ -101,6 +102,7 @@ enum Type ast_get_type(AST *node){
 
 void ast_set_data(AST* node, NodeData data){
 	switch(node->kind){
+		case NODE_FUNC:
 		case NODE_FCALL:
 			node->type = func_get_return(data.func.func);
 			node->data = data;
@@ -123,7 +125,6 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_OVER:
 		case NODE_PLUS:
 		case NODE_SCANF:
-		case NODE_FUNC:
 		case NODE_FUNC_RET:
 		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
@@ -357,15 +358,63 @@ Literal* ast_get_literal(AST* node){
 	return NULL;
 }
 
+Variable* ast_get_variable(AST* node){
+	switch(node->kind){
+		case NODE_VAR_USE:
+		case NODE_VAR_DECL:
+		case NODE_ARRAY_VAL:
+			return &node->data.var.var;
+		case NODE_ASSIGN:
+		case NODE_CHR_VAL:
+		case NODE_EQ:
+		case NODE_FLT_VAL:
+		case NODE_INT_VAL:
+		case NODE_LT:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_SCANF:
+		case NODE_FUNC:
+		case NODE_FUNC_USE:
+		case NODE_STR_VAL:
+		case NODE_TIMES:
+		case NODE_PRINTF:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
+		case NODE_MOD:
+		case NODE_PROGRAM:
+		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_VAR_LIST:
+		case NODE_WHILE:
+		case NODE_I2F:
+		case NODE_I2C:
+		case NODE_C2I:
+		case NODE_C2F:
+		case NODE_F2I:
+		case NODE_F2C:
+		case NODE_NOCONV:
+		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
+		case NODE_FCALL:
+		case NODE_FUNC_RET:
+			break;
+	}
+	return NULL;
+}
 
 void ast_print(AST* ast){
 	ast_print_rec(ast, -1);
 }
 
-void print_dot(AST *tree) {
-	fprintf(stderr, "digraph {\ngraph [ordering=\"out\"];\n");
-	print_node_dot(tree);
-	fprintf(stderr, "}\n");
+void ast_export_dot(AST *tree, FILE* fpout) {
+	fdump = fpout;
+	fprintf(fdump, "digraph {\ngraph [ordering=\"out\"];\n");
+	ast_export_dot_rec(tree);
+	fprintf(fdump, "}\n");
+	fdump = NULL;
 }
 
 static void ast_print_rec(AST* ast, int parent){
@@ -389,7 +438,7 @@ static void ast_print_rec(AST* ast, int parent){
 	printf("===END %d===\n", ast->id);
 }
 
-static void print_node_dot(AST *node) {
+static void ast_export_dot_rec(AST *node) {
 	NodeKind kind = node->kind;
 	NodeData data = node->data;
 	enum Type type = node->type;
@@ -397,50 +446,50 @@ static void print_node_dot(AST *node) {
 	const size_t count = ast_get_children_count(node);
 
 	//beginning of label
-	fprintf(stderr, "node%d[label=\"", node->id);
+	fprintf(fdump, "node%d[label=\"", node->id);
 
 	if(type != TYPE_VOID) {
-		fprintf(stderr, "(%s) ", typename);
+		fprintf(fdump, "(%s) ", typename);
 	}
 
 	if(kind == NODE_VAR_DECL || kind == NODE_VAR_USE) {
-		fprintf(stderr, "%s@%d", data.var.var.name, scope_get_id(data.var.scope));
+		fprintf(fdump, "%s@%d", data.var.var.name, scope_get_id(data.var.scope));
 	}
 	else{
-		fprintf(stderr, "%s", ast_kind2str(kind));
+		fprintf(fdump, "%s", ast_kind2str(kind));
 	}
 
 	if(kind == NODE_ARRAY_VAL){
-		fprintf(stderr, "#%d", node->data.var.var.qualifier);
+		fprintf(fdump, "#%d", node->data.var.var.qualifier);
 	}
 
 	if(ast_has_literal(node)) {
 		if(node->kind == NODE_FLT_VAL) {
-			fprintf(stderr, "%.2f", data.lit.value.f);
+			fprintf(fdump, "%.2f", data.lit.value.f);
 		}
 		else if(node->kind == NODE_STR_VAL) {
-			fprintf(stderr, "@%s", data.lit.value.s);
+			fprintf(fdump, "@%s", data.lit.value.s);
 		}
 		else if(node->kind == NODE_CHR_VAL) {
-			fprintf(stderr, "%c", data.lit.value.c);
+			fprintf(fdump, "%c", data.lit.value.c);
 		}
 		else if(node->kind == NODE_INT_VAL) {
-			fprintf(stderr, "%d", data.lit.value.i);
+			fprintf(fdump, "%d", data.lit.value.i);
 		}
 	}
 
-	fprintf(stderr, "\"];\n");
+	fprintf(fdump, "\"];\n");
 	//end of label
 
 	AST* child;
 	for(int i = 0; i < count; i++) {
 		child = ast_get_child(node, i);
 		if(child != NULL){
-		  print_node_dot(child);
+		  ast_export_dot_rec(child);
 		}
 		else{
 		  fprintf(stdout, "node%d is null\n", child->id);
 		}
-		fprintf(stderr, "node%d -> node%d;\n", node->id, child->id);
+		fprintf(fdump, "node%d -> node%d;\n", node->id, child->id);
 	}
 }

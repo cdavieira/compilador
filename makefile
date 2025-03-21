@@ -33,6 +33,9 @@ CFLAGS := -Wall -I$(srcdir)/lib
 # CFLAGS += -DDEBUG_EXPR_TYPE
 # Add debug information about the AST
 # CFLAGS += -DDEBUG_AST
+# Add LLVM IR code gen
+# CFLAGS += -DGEN_LLVM
+
 
 flex_src := $(srcdir)/src/lexer.yy.c
 flex_hdr := $(srcdir)/lib/lexer.yy.h
@@ -88,12 +91,19 @@ $(flex_src): $(lfile)
 	$(FLEX) $(FLEXFLAGS) -o $@ $<
 
 run:
-	./$(parsername) 2> $(bison_log)
+	./$(parsername) <$(testfile) 2> $(bison_log)
 	@echo "Output saved to: $(bison_log)"
 
 pdf: clean all
-	./$(parsername) <$(testfile) 2>$(notdir $(testfile)).dot
-	dot -Tpdf $(notdir $(testfile)).dot > $(notdir $(testfile)).pdf
+	./$(parsername) <$(testfile)
+	dot -Tpdf tmp.dot > $(notdir $(testfile)).pdf
+	rm tmp.dot
+
+# clang -S -emit-llvm main.c
+ll: clean all
+	./$(parsername) <$(testfile)
+	cp tmp.ll $(notdir $(testfile)).ll
+	rm tmp.ll
 
 val:
 	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < $(testfile)
@@ -124,10 +134,12 @@ help:
 	@echo ""
 	@echo "Compilation targets"
 	@echo "all:    build the parser and lexer executables"
-	@echo "parser: build the parser executable"
+	@echo "pdf:    generate the AST in pdf format"
+	@echo "ll:     generate LLVM IR code for the AST"
 	@echo ""
 	@echo "Test targets"
 	@echo "run:    run the parser connected to stdin and save stdout and stderr to $(bison_log)"
+	@echo "val:    run the parser with a testfile through valgrind"
 	@echo "test:   run the parser with all test suite"
 	@echo ""
 	@echo "Clean targets"

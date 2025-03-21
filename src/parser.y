@@ -315,8 +315,8 @@ declarator_array:
 /* Declaração/definição de funções */
 
 declaration_func:
-  type_specifier ID func_paramlist DELI          { $$ = ast_manager_add_function($2, $1, $3, NULL, 0); }
-| type_specifier ID func_paramlist LCURLY RCURLY { $$ = ast_manager_add_function($2, $1, $3, NULL, 1); }
+  type_specifier ID func_paramlist DELI          { funcname = $2; retvartype = $1; $$ = ast_manager_add_function($2, $1, $3, NULL, 0); }
+| type_specifier ID func_paramlist LCURLY RCURLY { funcname = $2; retvartype = $1; $$ = ast_manager_add_function($2, $1, $3, NULL, 1); }
 | type_specifier ID func_paramlist LCURLY { function_pre_body($2, $1); } block_stmts RCURLY { $$ = ast_manager_add_function($2, $1, $3, $6, 1); }
 ;
 
@@ -480,7 +480,9 @@ void parser_print(void){
 #endif
 #ifdef DEBUG_AST
 	ast_print(root);
-	print_dot(root);
+	FILE* fpout = fopen("tmp.dot", "w");
+	ast_export_dot(root, fpout);
+	fclose(fpout);
 #endif
 }
 
@@ -909,7 +911,8 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 	}
 
 	NodeData data;
-	data.lit = (Literal){.type = retvartype};
+	Function* f = func_table_search(functable, funcname);
+	data.func.func = f;
 	ast_add_child(ast, head);
 	ast_add_child(ast, body);
 	ast_set_data(ast, data);

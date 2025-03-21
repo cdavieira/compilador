@@ -1,5 +1,6 @@
 #include "types/Scope.h"
 #include "types/Function.h"
+#include "types/AST.h"
 
 #include <string.h>
 #include <malloc.h>
@@ -11,6 +12,7 @@ struct Function {
 	int param_count;
 	Scope* scope;
 	enum Type ret;
+	AST* entrypoint;
 };
 
 Function* func_new(char* name, Scope* scope, enum Type ret, int param_count, int definition){

@@ -1,3 +1,9 @@
+* [ ] talvez a funcao 'llvm_genIR_value' sirva para outros tipos de dado tambem
+* [ ] fazer o dump da string table
+* [ ] talvez substituir a chamada das funcoes 'llvm_genIR_sum/sub/mul/div' pela generica delas
+* [ ] terminar funcoes de expressao
+* [ ] fazer Frames da memoria e guardar ponteiro para Frame atual (para tratar recursividade)
+
 # DOING
 * [ ] fazer o bind correto de variaveis do tipo string e array
 * [ ] checar se a redeclaração de uma funcao nao conflita com a lista de parametros
