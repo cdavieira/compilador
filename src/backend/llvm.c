@@ -164,34 +164,16 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_MOD:
 			return llvm_genIR_rem(root);
 		case NODE_EQ:
-			// indent();
-			// fprintf(fdump, "; TODO: == operation\n\n");
-			// return -1;
 			return llvm_genIR_eq(root);
 		case NODE_LT:
-			// indent();
-			// fprintf(fdump, "; TODO: < operation\n\n");
-			// return -1;
 			return llvm_genIR_lt(root);
 		case NODE_GT:
-			// indent();
-			// fprintf(fdump, "; TODO: > operation\n\n");
-			// return -1;
 			return llvm_genIR_gt(root);
 		case NODE_NE:
-			// indent();
-			// fprintf(fdump, "; TODO: != operation\n\n");
-			// return -1;
 			return llvm_genIR_ne(root);
 		case NODE_OR:
-			// indent();
-			// fprintf(fdump, "; TODO: || operation\n\n");
-			// return -1;
 			return llvm_genIR_or(root);
 		case NODE_AND:
-			// indent();
-			// fprintf(fdump, "; TODO: && operation\n\n");
-			// return -1;
 			return llvm_genIR_and(root);
 
 
@@ -279,22 +261,22 @@ void llvm_genIR_strtable(void){
 		bytes = strlen(str);
 		fprintf(fdump, "@.str%lu = private unnamed_addr constant [%lu x i8] c\"", i, sz + 1);
 		for(size_t j=0; j<bytes; j++){
-		  if(str[j] == '\\'){
-		    switch(str[j+1]){
-		      case 'n':
-			fprintf(fdump, "\\%02X", '\n');
-			break;
-		      case 't':
-			fprintf(fdump, "\\%02X", '\t');
-			break;
-		      default:
-			break;
-		    }
-		    j++;
-		  }
-		  else{
-		    fprintf(fdump, "%c", str[j]);
-		  }
+			if(str[j] == '\\'){
+				switch(str[j+1]){
+					case 'n':
+						fprintf(fdump, "\\%02X", '\n');
+						break;
+					case 't':
+						fprintf(fdump, "\\%02X", '\t');
+						break;
+					default:
+						break;
+				}
+				j++;
+			}
+			else{
+				fprintf(fdump, "%c", str[j]);
+			}
 		}
 		fprintf(fdump, "\\00\", align 1\n");
 	}

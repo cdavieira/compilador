@@ -1,6 +1,9 @@
 /* ??? */
 * [ ] fazer o bind correto de variaveis do tipo string e array
 * [ ] checar se a redeclaração de uma funcao nao conflita com a lista de parametros
+* [ ] remove code ambiguity in llvm.c (there's a lot!)
+* [ ] criar llvm_printf (que se encarregará de chamar a funcao indent())
+* [ ] criar macro/funcao que encapsule a adição de comentários no arquivo .ll final
 
 /* 21/03 */
 * [*] fazer o dump da string table
