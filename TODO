@@ -4,6 +4,7 @@
 * [ ] remove code ambiguity in llvm.c (there's a lot!)
 * [ ] criar llvm_printf (que se encarregará de chamar a funcao indent())
 * [ ] criar macro/funcao que encapsule a adição de comentários no arquivo .ll final
+* [ ] fazer algo como: llvm_new_reg(ltype) em vez do macro podre
 
 /* 21/03 */
 * [*] fazer o dump da string table
@@ -15,6 +16,7 @@
 
 /* 22/03 */
 * [*] if/while
+* [*] fazer dump das funcoes definidas pelo programador
 * [ ] fazer funcoes
 * [ ] ver qual o suporte do llvm para funções
 * [ ] frame de função

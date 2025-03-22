@@ -40,7 +40,7 @@ Dicionário de termos usados no arquivo de configuração do bison (`parser/pars
 
 
 ## Como rodar
-```
+```makefile
 # gerar os programas do lexer e do parser (./mylexer e ./myparser)
 make
 

@@ -97,6 +97,7 @@ AST* ast_manager_add_funcret(AST* expr);
 AST* ast_manager_fcall(char* funcname);
 AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblock, int function_definition);
 AST* ast_manager_binop(AST* op1, AST* op2, NodeKind nodekind, TypeData (*operation)(enum Type, enum Type));
+int ast_manager_missing_retstmt(AST* fblock);
 
 %}
 
@@ -953,7 +954,12 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 	AST* ast = ast_new_node(NODE_FUNC);
 	AST* head = params != NULL ? params : ast_new_node(NODE_FUNC_PARAMLIST);
 	AST* body = ast_new_node(NODE_FUNC_BODY); 
-	if(fblock != NULL){
+	if(function_definition){
+		fblock = fblock == NULL ? ast_new_node(NODE_BLOCK) : fblock;
+		//Although needed, we don't have to check for type == TYPE_VOID, because the grammar enforces that
+		if(ast_manager_missing_retstmt(fblock)){
+			ast_add_child(fblock, ast_manager_add_funcret(NULL));
+		}
 		ast_add_child(body, fblock);
 	}
 
@@ -967,6 +973,16 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 	parser_scope_exit();
 
 	return ast;
+}
+
+int ast_manager_missing_retstmt(AST* fblock){
+	AST* child;
+	unsigned childCount = ast_get_children_count(fblock);
+	if(childCount == 0){
+		return 1;
+	}
+	NodeKind kind = ast_get_kind(ast_get_child(fblock, childCount - 1));;
+	return kind != NODE_FUNC_RET;
 }
 
 AST* ast_manager_binop(

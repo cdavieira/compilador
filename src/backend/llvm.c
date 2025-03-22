@@ -675,8 +675,12 @@ void llvm_genIR_while(AST* ast){
 
 void llvm_genIR_function_definition(AST* fnode){
 	Function* f = ast_get_data(fnode).func.func;
-	const char* fname = func_get_name(f);
+	if(!func_is_defined(f)){
+		return ;
+	}
+
 	enum Type fret = func_get_return(f);
+	const char* fname = func_get_name(f);
 	const char* llvm_ftype = llvm_get_type(fret);
 
 	llvm_comment1("Writing function");
@@ -691,9 +695,11 @@ void llvm_genIR_function_definition(AST* fnode){
 		llvm_print("()");
 	}
 	else{
-		llvm_print("(%s", llvm_get_type(ast_get_type(ast_get_child(paramlist, 0))));
+		AST* child = ast_get_child(paramlist, 0);
+		llvm_print("(%s", llvm_get_type(ast_get_type(child)));
 		for(size_t i=1; i<childCount; i++){
-			llvm_print(", %s", llvm_get_type(ast_get_type(ast_get_child(paramlist, i))));
+			child = ast_get_child(paramlist, i);
+			llvm_print(", %s", llvm_get_type(ast_get_type(child)));
 		}
 		llvm_print(")");
 	}
