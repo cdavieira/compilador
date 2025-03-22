@@ -392,6 +392,18 @@ stmt_while:
   WHILE LPAR expr RPAR block { $$ = ast_manager_while_stmt($3, $5); }
 ;
 
+// TODO: replace assign with stmt_assign and fix errors
+// stmt_for:
+//   FOR LPAR DELI DELI RPAR block_stmt /* for(;;) {...}; */
+// | FOR LPAR type_specifier declarators DELI DELI RPAR block_stmt /* for(int i=0;;) {...} */
+// | FOR LPAR DELI expr DELI RPAR block_stmt   /* for(;i<1;) {...} */
+// | FOR LPAR DELI DELI assign RPAR block_stmt /* for(;;i=i+1) {...} */
+// | FOR LPAR type_specifier declarators DELI expr DELI RPAR block_stmt /* for(int i=0;i<10;) {...} */
+// | FOR LPAR DELI expr DELI assign RPAR block_stmt /* for(;i<10;i=i+1) {...} */
+// | FOR LPAR type_specifier declarators DELI DELI assign RPAR block_stmt /* for(int i=0;;i=i+1) {...} */
+// | FOR LPAR type_specifier declarators DELI expr DELI assign RPAR block_stmt /* for(int i=0;i<10;i=i+1) {...} */
+// ;
+
 stmt_if:
   IF LPAR expr RPAR block              { $$ = ast_manager_if_stmt($3, $5, NULL); }
 | IF LPAR expr RPAR block ELSE block   { $$ = ast_manager_if_stmt($3, $5, $7); }
@@ -560,9 +572,6 @@ AST* add_var_declaration(char* name, enum Type type, enum Qualifier qualifier, A
 	data.var.var = *var;
 	data.var.scope = scope;
 	ast_set_data(ast, data);
-
-	//making sure we are dealing with either a basic type or with an array type
-	// assert((qualifier == QUALIFIER_BASIC) || (qualifier != QUALIFIER_POINTER));
 
 	if(qualifier == QUALIFIER_BASIC){
 		if(init != NULL){

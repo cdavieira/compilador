@@ -38,11 +38,15 @@
 //on writing strings
 //https://stackoverflow.com/questions/14710427/what-really-is-0a-00-in-llvm-string
 
+//on if stmts
+//https://llvm.org/docs/LangRef.html#br-instruction
 
 
 #include "backend/llvm.h"
+// #include "parser/VarTable.h"
 #include "types/AST.h"
 #include "types/Function.h"
+// #include "types/Scope.h"
 #include "types/Type.h"
 #include "parser/FuncTable.h"
 #include "utils/Vector.h"
@@ -53,10 +57,13 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdarg.h>
 
 
 
 #define LLVM_NEW_INT_REG() (registerID++)
+#define llvm_comment1(fmt) llvm_iprint("; "fmt"\n")
+#define llvm_comment2(fmt, ...) llvm_iprint("; "fmt"\n", __VA_ARGS__)
 
 
 
@@ -68,7 +75,9 @@ enum arghint {
 
 
 FILE* fdump;
-int registerID = 1;
+int registerID = 1; //this should be unsigned actually
+unsigned ifID = 1;
+unsigned whileID = 1;
 int indentLevel;
 int *llvm_memory;
 extern int var_count; // parser.y
@@ -84,17 +93,21 @@ void llvm_genIR_strtable(void);
 
 /* expr */
 int llvm_genIR_value(AST* node);
-int llvm_genIR_convdummy(const char* opcode, int fromreg, enum Type from, enum Type to);
-int llvm_genIR_conv(AST* node);
+int llvm_IR_conv(AST* node);
+int llvm_genIR_conv(const char* opcode, int fromreg, enum Type from, enum Type to);
 int llvm_genIR_vardecl(AST* node);
 int llvm_genIR_varuse(AST* node);
 int llvm_genIR_assign(AST* node);
-int llvm_genIR_binop(const char* opcode, const char* retname, int regL, int regR);
-int llvm_genIR_binlop(const char* opcode, const char* cond, const char* retname, int regL, int regR);
+
+int llvm_IR_binlop(AST* ast, const char* opcode, const char* cond);
+int llvm_genIR_binlop(AST* ast, const char* icode, const char* fcode);
 int llvm_genIR_lt(AST* ast);
 int llvm_genIR_gt(AST* ast);
 int llvm_genIR_eq(AST* ast);
 int llvm_genIR_ne(AST* ast);
+
+int llvm_IR_binop(AST* ast, const char* opcode);
+int llvm_genIR_binop(AST* ast, const char* icode, const char* fcode);
 int llvm_genIR_and(AST* ast);
 int llvm_genIR_or(AST* ast);
 int llvm_genIR_sum(AST* ast);
@@ -103,18 +116,30 @@ int llvm_genIR_mul(AST* ast);
 int llvm_genIR_div(AST* ast);
 int llvm_genIR_rem(AST* ast);
 
+/* c stmt */
+void llvm_genIR_if(AST* ast);
+void llvm_genIR_while(AST* ast);
+
 /* func */
 void llvm_genIR_function_definition(AST* fnode);
 int llvm_genIR_function_return(AST* ret);
+int llvm_genIR_printlike_dummy(AST* ast, const char* fname);
 int llvm_genIR_printf(AST* ast);
+int llvm_genIR_scanf(AST* ast);
 int llvm_genIR_fcall(AST* ast);
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint);
 void llvm_genIR_paramlist(AST* ast, size_t childCount, int argregs[childCount], enum arghint hint);
 
 /* helpers */
 void indent();
+void llvm_print(const char* fmt, ...);
+void llvm_iprint(const char* fmt, ...);
+void llvm_IR_label(const char* label);
+void llvm_IR_goto(const char* label);
+void llvm_IR_condgoto(int reg, char* labeltrue, char* labelfalse);
 size_t count_chars(const char* str);
 const char* llvm_get_type(enum Type type);
+int llvm_get_size(enum Type type);
 
 
 
@@ -152,7 +177,7 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_C2F:
 		case NODE_F2C:
 		case NODE_I2C:
-			return llvm_genIR_conv(root);
+			return llvm_IR_conv(root);
 		case NODE_PLUS:
 			return llvm_genIR_sum(root);
 		case NODE_MINUS:
@@ -193,25 +218,29 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_FUNC_RET:
 			return llvm_genIR_function_return(root);
 		case NODE_FCALL:
-			indent();
-			fprintf(fdump, "; TODO: fcall\n\n");
-			return -1;
+			llvm_comment1("TODO: fcall\n");
+			break;
 		case NODE_SCANF:
-			indent();
-			fprintf(fdump, "; TODO: scanf\n\n");
-			return -1;
+			return llvm_genIR_scanf(root);
 		case NODE_PRINTF:
 			return llvm_genIR_printf(root);
 
 
 		// Arrays (compound variables)
 		case NODE_ARRAY_VAL:
-			indent();
-			fprintf(fdump, "; TODO: Loading array val\n\n");
+			llvm_comment1("TODO: Loading array val\n");
 			return -1;
 		case NODE_PTR_VAL:
-			indent();
-			fprintf(fdump, "; TODO: Loading ptr val\n\n");
+			llvm_comment1("TODO: Loading ptr val\n");
+			return -1;
+
+
+		// C statements
+		case NODE_IF:
+			llvm_genIR_if(root);
+			return -1;
+		case NODE_WHILE:
+			llvm_genIR_while(root);
 			return -1;
 
 
@@ -222,12 +251,10 @@ int llvm_genIR_recursive(AST* root){
 
 
 		// Node kinds which don't need to be handled (only their children)
-		case NODE_PROGRAM:
-		case NODE_VAR_LIST:
-		case NODE_BLOCK:
-		case NODE_IF:
-		case NODE_WHILE:
-		case NODE_FUNC_BODY:
+		case NODE_PROGRAM: //has 0 or 1 child
+		case NODE_FUNC_BODY: //has 0 or 1 children
+		case NODE_VAR_LIST: //has 1 or more children
+		case NODE_BLOCK: //has 1 or more children
 			// printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
 			for(unsigned i=0; i<childCount; i++){
 				llvm_genIR_recursive(ast_get_child(root, i));
@@ -240,16 +267,45 @@ int llvm_genIR_recursive(AST* root){
 }
 
 void llvm_genIR_ftable(void){
-	fprintf(fdump, "; Dumping ftable\n");
+	llvm_print("; Dumping ftable\n");
 
-	fprintf(fdump, "declare i32 @printf(i8*, ...)\n");
-	fprintf(fdump, "declare i32 @scanf(i8*, ...)\n");
+	llvm_print("declare i32 @printf(i8*, ...)\n");
+	llvm_print("declare i32 @scanf(i8*, ...)\n");
 
-	fprintf(fdump, "\n");
+	// unsigned count = func_table_get_size(functable);
+	// Function* f;
+	// Scope* scope;
+	// VarTable* vt;
+	// Variable* var;
+	// const char* fname;
+	// const char* llvmtypename;
+	// int nparams;
+	// for(unsigned i=2; i<count; i++){
+	// 	f = func_table_get(functable, i);
+
+	// 	nparams = func_get_nparams(f);
+
+	// 	fname = func_get_name(f);
+	// 	llvmtypename = llvm_get_type(func_get_return(f));
+	// 	scope = func_get_scope(f);
+	// 	vt = scope_get_vartable(scope);
+
+	// 	llvm_print("declare %s @%s(", llvmtypename, fname);
+	// 	if(nparams != 0){
+	// 		var = vartable_idx(vt, 0);
+	// 		llvm_print("%s", llvm_get_type(var->type));
+	// 		for(int j=1; j<nparams; j++){
+	// 			llvm_print(", %s", llvm_get_type(var->type));
+	// 		}
+	// 	}
+	// 	llvm_print(")\n");
+	// }
+
+	llvm_print("\n");
 }
 
 void llvm_genIR_strtable(void){
-	fprintf(fdump, "; Dumping string table\n");
+	llvm_comment1("Dumping string table");
 
 	size_t count = vector_get_size(stringliterals);
 	const char* str;
@@ -259,15 +315,15 @@ void llvm_genIR_strtable(void){
 		str = vector_get_item(stringliterals, i);
 		sz = count_chars(str);
 		bytes = strlen(str);
-		fprintf(fdump, "@.str%lu = private unnamed_addr constant [%lu x i8] c\"", i, sz + 1);
+		llvm_print("@.str%lu = private unnamed_addr constant [%lu x i8] c\"", i, sz + 1);
 		for(size_t j=0; j<bytes; j++){
 			if(str[j] == '\\'){
 				switch(str[j+1]){
 					case 'n':
-						fprintf(fdump, "\\%02X", '\n');
+						llvm_print("\\%02X", '\n');
 						break;
 					case 't':
-						fprintf(fdump, "\\%02X", '\t');
+						llvm_print("\\%02X", '\t');
 						break;
 					default:
 						break;
@@ -275,13 +331,13 @@ void llvm_genIR_strtable(void){
 				j++;
 			}
 			else{
-				fprintf(fdump, "%c", str[j]);
+				llvm_print("%c", str[j]);
 			}
 		}
-		fprintf(fdump, "\\00\", align 1\n");
+		llvm_print("\\00\", align 1\n");
 	}
 
-	fprintf(fdump, "\n");
+	llvm_print("\n");
 }
 
 
@@ -296,78 +352,57 @@ int llvm_genIR_value(AST* node){
 	int reg1 = -1;
 	int reg2 = -1;
 
-	indent();
-	fprintf(fdump, "; Loading %s literal\n", llvmtype);
+	llvm_comment2("Loading %s literal", llvmtype);
 	switch(vtype){
 		case TYPE_INT:
 			reg1 = LLVM_NEW_INT_REG();
 			reg2 = LLVM_NEW_INT_REG();
-
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 4\n", reg1, llvmtype);
-
-			indent();
-			fprintf(fdump, "store %s %d, ptr %%%d, align 4\n", llvmtype, l->value.i, reg1);
-
-			indent();
-			fprintf(fdump, "%%%d = load %s, ptr %%%d, align 4\n", reg2, llvmtype, reg1);
+			llvm_iprint("%%%d = alloca %s, align 4\n", reg1, llvmtype);
+			llvm_iprint("store %s %d, ptr %%%d, align 4\n", llvmtype, l->value.i, reg1);
+			llvm_iprint("%%%d = load %s, ptr %%%d, align 4\n", reg2, llvmtype, reg1);
 			break;
 		case TYPE_FLT:
 			reg1 = LLVM_NEW_INT_REG();
 			reg2 = LLVM_NEW_INT_REG();
-
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 4\n", reg1, llvmtype);
-
-			indent();
-			fprintf(fdump, "store %s %f, ptr %%%d, align 4\n", llvmtype, l->value.f, reg1);
-
-			indent();
-			fprintf(fdump, "%%%d = load %s, ptr %%%d, align 4\n", reg2, llvmtype, reg1);
+			llvm_iprint("%%%d = alloca %s, align 4\n", reg1, llvmtype);
+			llvm_iprint("store %s %f, ptr %%%d, align 4\n", llvmtype, l->value.f, reg1);
+			llvm_iprint("%%%d = load %s, ptr %%%d, align 4\n", reg2, llvmtype, reg1);
 			break;
 		case TYPE_CHAR:
 			reg1 = LLVM_NEW_INT_REG();
 			reg2 = LLVM_NEW_INT_REG();
-
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 1\n", reg1, llvmtype);
-
-			indent();
-			fprintf(fdump, "store %s %d, ptr %%%d, align 1\n", llvmtype, l->value.c, reg1);
-
-			indent();
-			fprintf(fdump, "%%%d = load %s, ptr %%%d, align 1\n", reg2, llvmtype, reg1);
+			llvm_iprint("%%%d = alloca %s, align 1\n", reg1, llvmtype);
+			llvm_iprint("store %s %d, ptr %%%d, align 1\n", llvmtype, l->value.c, reg1);
+			llvm_iprint("%%%d = load %s, ptr %%%d, align 1\n", reg2, llvmtype, reg1);
 			break;
 		case TYPE_STR:
 			reg2 = l->value.i;
-			indent();
-			fprintf(fdump, "; \"%s\"@%d\n", (char*) vector_get_item(stringliterals, reg2), reg2);
+			llvm_comment2("\"%s\"@%d", (char*) vector_get_item(stringliterals, reg2), reg2);
 			break;
 		default:
 			break;
 	}
 
-	fprintf(fdump, "\n");
-
+	llvm_print("\n");
 	return reg2;
 }
 
-int llvm_genIR_conv(AST* node){
+int llvm_IR_conv(AST* node){
 	NodeKind kind = ast_get_kind(node);
 	int src = llvm_genIR_recursive(ast_get_child(node, 0));
 	switch(kind){
 		case NODE_C2F:
-			return llvm_genIR_convdummy("uitofp", src, TYPE_CHAR, TYPE_FLT);
+			return llvm_genIR_conv("uitofp", src, TYPE_CHAR, TYPE_FLT);
 		case NODE_C2I:
-			return llvm_genIR_convdummy("zext", src, TYPE_CHAR, TYPE_INT);
+			return llvm_genIR_conv("zext", src, TYPE_CHAR, TYPE_INT);
 		case NODE_I2C:
-			return llvm_genIR_convdummy("trunc", src, TYPE_INT, TYPE_CHAR);
+			return llvm_genIR_conv("trunc", src, TYPE_INT, TYPE_CHAR);
 		case NODE_I2F:
-			return llvm_genIR_convdummy("sitofp", src, TYPE_INT, TYPE_FLT);
+			return llvm_genIR_conv("sitofp", src, TYPE_INT, TYPE_FLT);
 		case NODE_F2I:
-			return llvm_genIR_convdummy("fptosi", src, TYPE_FLT, TYPE_INT);
+			return llvm_genIR_conv("fptosi", src, TYPE_FLT, TYPE_INT);
 		case NODE_F2C:
-			return llvm_genIR_convdummy("fptoui", src, TYPE_FLT, TYPE_CHAR);
+			return llvm_genIR_conv("fptoui", src, TYPE_FLT, TYPE_CHAR);
 		default:
 			assert(0);
 			break;
@@ -375,53 +410,39 @@ int llvm_genIR_conv(AST* node){
 	return src;
 }
 
-int llvm_genIR_convdummy(const char* opcode, int fromreg, enum Type from, enum Type to){
+int llvm_genIR_conv(const char* opcode, int fromreg, enum Type from, enum Type to){
 	const char* fromname = llvm_get_type(from);
 	const char* toname = llvm_get_type(to);
 	int reg = LLVM_NEW_INT_REG();
 
-	indent();
-	fprintf(fdump, "; Converting from %s to %s\n", fromname, toname);
-
-	indent();
-	fprintf(fdump, "%%%d = %s %s %%%d to %s\n", reg, opcode, fromname, fromreg, toname);
-
-	fprintf(fdump, "\n");
+	llvm_comment2("Converting from %s to %s", fromname, toname);
+	llvm_iprint("%%%d = %s %s %%%d to %s\n\n", reg, opcode, fromname, fromreg, toname);
 
 	return reg;
 }
 
 int llvm_genIR_vardecl(AST* node){
-	enum Type vtype = ast_get_type(node);
 	Variable* v = ast_get_variable(node);
 	unsigned count = ast_get_children_count(node);
+	enum Type vtype = ast_get_type(node);
+
+	const char* llvmtype = llvm_get_type(vtype);
+	int llvmsize = llvm_get_size(vtype);
 	int has_val = count != 0;
 	AST* ininode = has_val ? ast_get_child(node, 0) : NULL;
 	int reg1 = has_val ? llvm_genIR_recursive(ininode) : -1;
-	const char* llvmtype = llvm_get_type(vtype);
 	int reg2 = LLVM_NEW_INT_REG();
 
-	indent();
-	fprintf(fdump, "; Declaring %s variable\n", llvmtype);
+	llvm_comment2("Declaring %s variable", llvmtype);
 
 	switch(vtype){
 		case TYPE_FLT:
 		case TYPE_INT:
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 4\n", reg2, llvmtype);
-			llvm_memory[v->addr] = reg2;
-			if(has_val){
-				indent();
-				fprintf(fdump, "store %s %%%d, ptr %%%d, align 4\n", llvmtype, reg1, reg2);
-			}
-			break;
 		case TYPE_CHAR:
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 1\n", reg2, llvmtype);
+			llvm_iprint("%%%d = alloca %s, align %d\n", reg2, llvmtype, llvmsize);
 			llvm_memory[v->addr] = reg2;
 			if(has_val){
-				indent();
-				fprintf(fdump, "store %s %%%d, ptr %%%d, align 1\n", llvmtype, reg1, reg2);
+				llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
 			}
 			break;
 		default:
@@ -429,36 +450,30 @@ int llvm_genIR_vardecl(AST* node){
 			break;
 	}
 
-	fprintf(fdump, "\n");
+	llvm_print("\n");
 
 	return reg2;
 }
 
 int llvm_genIR_varuse(AST* node){
+	Variable* v = ast_get_variable(node);
 	enum Type vtype = ast_get_type(node);
 	const char* llvmtype = llvm_get_type(vtype);
-	Variable* v = ast_get_variable(node);
+	int llvmsize = llvm_get_size(vtype);
 	int reg1 = LLVM_NEW_INT_REG();
 
-	indent();
-	fprintf(fdump, "; Reading %s variable from memory\n", llvmtype);
-
+	llvm_comment2("Reading %s variable from memory", llvmtype);
 	switch(vtype){
 		case TYPE_FLT:
 		case TYPE_INT:
-			indent();
-			fprintf(fdump, "%%%d = load %s, ptr %%%d, align 4\n", reg1, llvmtype, llvm_memory[v->addr]);
-			break;
 		case TYPE_CHAR:
-			indent();
-			fprintf(fdump, "%%%d = load %s, ptr %%%d, align 1\n", reg1, llvmtype, llvm_memory[v->addr]);
+			llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", reg1, llvmtype, llvm_memory[v->addr], llvmsize);
 			break;
 		default:
 			assert(0);
 			break;
 	}
-
-	fprintf(fdump, "\n");
+	llvm_print("\n");
 
 	return reg1;
 }
@@ -469,123 +484,93 @@ int llvm_genIR_assign(AST* node){
 	enum Type vtype = ast_get_type(lhs);
 	Variable* var = ast_get_variable(lhs);
 	const char* llvmtype = llvm_get_type(vtype);
+	int llvmsize = llvm_get_size(vtype);
 
-	indent();
-	fprintf(fdump, "; Writing to %s variable (%s) in memory\n", llvmtype, var->name);
+	llvm_comment2("Writing to %s variable (%s) in memory", llvmtype, var->name);
 
 	int reg1 = llvm_genIR_recursive(rhs);
-	int reg2 = LLVM_NEW_INT_REG();
-
+	int reg2 = llvm_memory[var->addr];
 	switch(vtype){
 		case TYPE_FLT:
 		case TYPE_INT:
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 4\n", reg2, llvmtype);
-
-			indent();
-			fprintf(fdump, "store %s %%%d, ptr %%%d, align 4\n", llvmtype, reg1, reg2);
-
-			llvm_memory[var->addr] = reg2;
-			break;
 		case TYPE_CHAR:
-			indent();
-			fprintf(fdump, "%%%d = alloca %s, align 1\n", reg2, llvmtype);
-
-			indent();
-			fprintf(fdump, "store %s %%%d, ptr %%%d, align 1\n", llvmtype, reg1, reg2);
-
-			llvm_memory[var->addr] = reg2;
+			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
 			break;
 		default:
 			assert(0);
 			break;
 	}
 
-	fprintf(fdump, "\n");
+	llvm_print("\n");
 	return reg2;
 }
 
-int llvm_genIR_binlop(const char* opcode, const char* cond, const char* retname, int regL, int regR){
-	//%0 = add i32 %X, %X 
-	int tmpVal = LLVM_NEW_INT_REG();
-	int resVal = LLVM_NEW_INT_REG();
+int llvm_IR_binlop(AST* ast, const char* opcode, const char* cond){
+	AST* L = ast_get_child(ast, 0);
+	AST* R = ast_get_child(ast, 1);
+	int regL = llvm_genIR_recursive(L);
+	int regR = llvm_genIR_recursive(R);
+	const char* retname = llvm_get_type(ast_get_type(L));
 
-	indent();
-	fprintf(fdump, "; Performing %s\n", opcode);
+	int tmpreg = LLVM_NEW_INT_REG();
+	int resreg = LLVM_NEW_INT_REG();
 
-	indent();
-	fprintf(fdump, "%%%d = %s %s %s %%%d, %%%d\n", tmpVal, opcode, cond, retname, regL, regR);
+	llvm_comment2("Performing %s", opcode);
+	llvm_iprint("%%%d = %s %s %s %%%d, %%%d\n", tmpreg, opcode, cond, retname, regL, regR);
+	llvm_iprint("%%%d = zext i1 %%%d to i32\n\n", resreg, tmpreg);
 
-	indent();
-	fprintf(fdump, "%%%d = zext i1 %%%d to i32\n", resVal, tmpVal);
+	return resreg;
+}
 
-	fprintf(fdump, "\n");
-
-	return resVal;
+int llvm_genIR_binlop(AST* ast, const char* icode, const char* fcode){
+	switch(ast_get_type(ast_get_child(ast, 0))){
+		case TYPE_INT:
+			return llvm_IR_binlop(ast, "icmp", icode);
+		case TYPE_FLT:
+			return llvm_IR_binlop(ast, "fcmp", fcode);
+		default:
+			assert(0);
+	}
+	return -1;
 }
 
 int llvm_genIR_lt(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	const char* retname = llvm_get_type(ast_get_type(L));
-	switch(ast_get_type(L)){
-	  case TYPE_INT:
-		  return llvm_genIR_binlop("icmp", "slt", retname, regL, regR);
-	  case TYPE_FLT:
-		  return llvm_genIR_binlop("fcmp", "olt", retname, regL, regR);
-	  default:
-		  assert(0);
-	}
-	return -1;
+	return llvm_genIR_binlop(ast, "slt", "olt");
 }
 
 int llvm_genIR_gt(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	const char* retname = llvm_get_type(ast_get_type(L));
-	switch(ast_get_type(L)){
-	  case TYPE_INT:
-		  return llvm_genIR_binlop("icmp", "sgt", retname, regL, regR);
-	  case TYPE_FLT:
-		  return llvm_genIR_binlop("fcmp", "ogt", retname, regL, regR);
-	  default:
-		  assert(0);
-	}
-	return -1;
+	return llvm_genIR_binlop(ast, "sgt", "ogt");
 }
 
 int llvm_genIR_eq(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	const char* retname = llvm_get_type(ast_get_type(L));
-	switch(ast_get_type(L)){
-	  case TYPE_INT:
-		  return llvm_genIR_binlop("icmp", "eq", retname, regL, regR);
-	  case TYPE_FLT:
-		  return llvm_genIR_binlop("fcmp", "oeq", retname, regL, regR);
-	  default:
-		  assert(0);
-	}
-	return -1;
+	return llvm_genIR_binlop(ast, "eq", "oeq");
 }
 
 int llvm_genIR_ne(AST* ast){
+	return llvm_genIR_binlop(ast, "ne", "one");
+}
+
+int llvm_IR_binop(AST* ast, const char* opcode){
+	enum Type rettype = ast_get_type(ast);
 	AST* L = ast_get_child(ast, 0);
 	AST* R = ast_get_child(ast, 1);
 	int regL = llvm_genIR_recursive(L);
 	int regR = llvm_genIR_recursive(R);
-	const char* retname = llvm_get_type(ast_get_type(L));
-	switch(ast_get_type(L)){
+	int reg = LLVM_NEW_INT_REG();
+	const char* retname = llvm_get_type(rettype);
+
+	llvm_comment2("Performing %s", opcode);
+	llvm_iprint("%%%d = %s %s %%%d, %%%d\n\n", reg, opcode, retname, regL, regR);
+
+	return reg;
+}
+
+int llvm_genIR_binop(AST* ast, const char* icode, const char* fcode){
+	switch(ast_get_type(ast)){
 	  case TYPE_INT:
-		  return llvm_genIR_binlop("icmp", "ne", retname, regL, regR);
+		  return llvm_IR_binop(ast, icode);
 	  case TYPE_FLT:
-		  return llvm_genIR_binlop("fcmp", "one", retname, regL, regR);
+		  return llvm_IR_binop(ast, fcode);
 	  default:
 		  assert(0);
 	}
@@ -593,131 +578,96 @@ int llvm_genIR_ne(AST* ast){
 }
 
 int llvm_genIR_and(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	return llvm_genIR_binop("and", retname, regL, regR);
+	return llvm_IR_binop(ast, "and");
 }
 
 int llvm_genIR_or(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	return llvm_genIR_binop("or", retname, regL, regR);
-}
-
-int llvm_genIR_binop(const char* opcode, const char* retname, int regL, int regR){
-	//%0 = add i32 %X, %X 
-	int resVal = LLVM_NEW_INT_REG();
-
-	indent();
-	fprintf(fdump, "; Performing %s\n", opcode);
-
-	indent();
-	fprintf(fdump, "%%%d = %s %s %%%d, %%%d\n", resVal, opcode, retname, regL, regR);
-
-	fprintf(fdump, "\n");
-
-	return resVal;
+	return llvm_IR_binop(ast, "or");
 }
 
 int llvm_genIR_sum(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-
-	switch(rettype){
-	  case TYPE_INT:
-		  return llvm_genIR_binop("add", retname, regL, regR);
-	  case TYPE_FLT:
-		  return llvm_genIR_binop("fadd", retname, regL, regR);
-	  default:
-		  assert(0);
-	}
-	return -1;
+	return llvm_genIR_binop(ast, "add", "fadd");
 }
 
 int llvm_genIR_sub(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	switch(rettype){
-	  case TYPE_INT:
-	    return llvm_genIR_binop("sub", retname, regL, regR);
-	  case TYPE_FLT:
-	    return llvm_genIR_binop("fsub", retname, regL, regR);
-	  default:
-	    assert(0);
-	}
-	return -1;
+	return llvm_genIR_binop(ast, "sub", "fsub");
 }
 
 int llvm_genIR_mul(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	switch(rettype){
-	  case TYPE_INT:
-	    return llvm_genIR_binop("mul", retname, regL, regR);
-	  case TYPE_FLT:
-	    return llvm_genIR_binop("fmul", retname, regL, regR);
-	  default:
-	    assert(0);
-	}
-	return -1;
+	return llvm_genIR_binop(ast, "mul", "fmul");
 }
 
 int llvm_genIR_div(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	switch(rettype){
-	  case TYPE_INT:
-	    return llvm_genIR_binop("sdiv", retname, regL, regR);
-	  case TYPE_FLT:
-	    return llvm_genIR_binop("fdiv", retname, regL, regR);
-	  default:
-	    assert(0);
-	}
-	return -1;
+	return llvm_genIR_binop(ast, "sdiv", "fdiv");
 }
 
 int llvm_genIR_rem(AST* ast){
-	AST* L = ast_get_child(ast, 0);
-	AST* R = ast_get_child(ast, 1);
-	int regL = llvm_genIR_recursive(L);
-	int regR = llvm_genIR_recursive(R);
-	enum Type rettype = ast_get_type(ast);
-	const char* retname = llvm_get_type(rettype);
-	switch(rettype){
-	  case TYPE_INT:
-	    return llvm_genIR_binop("srem", retname, regL, regR);
-	  case TYPE_FLT:
-	    return llvm_genIR_binop("frem", retname, regL, regR);
-	  default:
-	    assert(0);
-	}
-	return -1;
+	return llvm_genIR_binop(ast, "srem", "frem");
 }
 
+
+
+/* C STMTS */
+
+void llvm_genIR_if(AST* ast){
+	llvm_comment1("+++ if");
+
+	AST* expr = ast_get_child(ast, 0);
+	AST* ifchild = ast_get_child(ast, 1);
+	AST* elsechild = ast_get_child(ast, 2);
+	int reg = llvm_genIR_recursive(expr);
+	char iflabel[16];
+	char elselabel[16];
+	char escapelabel[16];
+
+	sprintf(iflabel, "ifif%u", ifID);
+	sprintf(elselabel, "ifelse%u", ifID);
+	sprintf(escapelabel, "ifesc%u", ifID++);
+
+	llvm_IR_condgoto(reg, iflabel, elsechild ? elselabel : escapelabel);
+	llvm_IR_label(iflabel);
+	llvm_genIR_recursive(ifchild);
+	llvm_IR_goto(escapelabel);
+
+	if(elsechild){
+		llvm_IR_label(elselabel);
+		llvm_genIR_recursive(elsechild);
+		llvm_IR_goto(escapelabel);
+	}
+	llvm_IR_label(escapelabel);
+
+	llvm_comment1("--- if");
+}
+
+void llvm_genIR_while(AST* ast){
+	llvm_comment1("+++ while");
+
+	AST* expr = ast_get_child(ast, 0);
+	AST* block = ast_get_child(ast, 1);
+	char condlabel[16];
+	char bodylabel[16];
+	char escapelabel[16];
+	int cmpreg = -1;
+
+	sprintf(condlabel, "whilecond%u", whileID);
+	sprintf(bodylabel, "whilebody%u", whileID);
+	sprintf(escapelabel, "whileesc%u", whileID++);
+
+	llvm_IR_goto(condlabel);
+	llvm_IR_label(condlabel);
+
+	cmpreg = llvm_genIR_recursive(expr);
+	llvm_IR_condgoto(cmpreg, bodylabel, escapelabel);
+
+	llvm_IR_label(bodylabel);
+	llvm_genIR_recursive(block);
+
+	llvm_comment1("looping");
+	llvm_IR_goto(condlabel);
+
+	llvm_IR_label(escapelabel);
+	llvm_comment1("--- while");
+}
 
 
 
@@ -729,68 +679,53 @@ void llvm_genIR_function_definition(AST* fnode){
 	enum Type fret = func_get_return(f);
 	const char* llvm_ftype = llvm_get_type(fret);
 
-	indent();
-	fprintf(fdump, "; Writing function\n");
+	llvm_comment1("Writing function");
 
 	//func name
-	fprintf(fdump, "define %s @%s", llvm_ftype, fname);
+	llvm_print("define %s @%s", llvm_ftype, fname);
 
 	//func paramlist
 	AST* paramlist = ast_get_child(fnode, 0);
 	size_t childCount = ast_get_children_count(paramlist);
 	if(childCount == 0){
-		fprintf(fdump, "()");
+		llvm_print("()");
 	}
 	else{
-		llvm_ftype = llvm_get_type(ast_get_type(ast_get_child(paramlist, 0)));
-		fprintf(fdump, "(");
-		fprintf(fdump, "%s", llvm_ftype);
+		llvm_print("(%s", llvm_get_type(ast_get_type(ast_get_child(paramlist, 0))));
 		for(size_t i=1; i<childCount; i++){
-			llvm_ftype = llvm_get_type(ast_get_type(ast_get_child(paramlist, i)));
-			fprintf(fdump, ", %s", llvm_ftype);
+			llvm_print(", %s", llvm_get_type(ast_get_type(ast_get_child(paramlist, i))));
 		}
-		fprintf(fdump, ")");
+		llvm_print(")");
 	}
 
 	//func body
-	fprintf(fdump, "{\n");
+	llvm_print("{\n");
 	indentLevel++;
 	llvm_genIR_recursive(ast_get_child(fnode, 1));
 	indentLevel--;
-
-	indent();
-	fprintf(fdump, "}\n");
-
-	indent();
-	fprintf(fdump, "\n");
+	llvm_print("}\n\n");
 }
 
 int llvm_genIR_function_return(AST* ret){
 	enum Type rettype = ast_get_type(ret);
 	const char* llvmtypename = llvm_get_type(rettype);
 	unsigned count = ast_get_children_count(ret);
-	assert(count != 0);
+	if(count == 0){
+		llvm_iprint("ret void\n");
+		return -1;
+	}
 
 	int reg = llvm_genIR_recursive(ast_get_child(ret, 0));
-
-	indent();
-	fprintf(fdump, "; Writing function return\n");
-
-	indent();
-	fprintf(fdump, "ret %s %%%d\n", llvmtypename, reg);
-
-	fprintf(fdump, "\n");
-
+	llvm_iprint("ret %s %%%d\n\n", llvmtypename, reg);
 	return reg;
 }
 
-int llvm_genIR_printf(AST* ast){
+int llvm_genIR_printlike_dummy(AST* ast, const char* fname){
 	//  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0))
 	size_t childCount = ast_get_children_count(ast);
 	assert(childCount != 0);
 
-	indent();
-	fprintf(fdump, ";; Calling printf\n");
+	llvm_comment2("+++ %s()\n", fname);
 
 	AST* child;
 	int argregs[childCount];
@@ -799,53 +734,51 @@ int llvm_genIR_printf(AST* ast){
 		argregs[i] = llvm_genIR_recursive(child);
 		if(ast_get_type(child) == TYPE_FLT){
 			int tmp = LLVM_NEW_INT_REG();
-			indent();
-			fprintf(fdump, "%%%d = fpext float %%%d to double\n", tmp, argregs[i]);
+			llvm_iprint("%%%d = fpext float %%%d to double\n", tmp, argregs[i]);
 			argregs[i] = tmp;
 		}
 	}
 
 	int reg1 = LLVM_NEW_INT_REG();
-
-	indent();
-	fprintf(fdump, "%%%d = call i32 (i8*, ...) @printf", reg1);
+	llvm_iprint("%%%d = call i32 (i8*, ...) @%s", reg1, fname);
 	llvm_genIR_paramlist(ast, childCount, argregs, ARG_FLT2DOUBLE);
-
-	indent();
-	fprintf(fdump, ";; End of printf\n\n");
-
+	llvm_comment2("--- %s()\n", fname);
 	return reg1;
 }
 
+int llvm_genIR_printf(AST* ast){
+	return llvm_genIR_printlike_dummy(ast, "printf");
+}
+
+int llvm_genIR_scanf(AST* ast){
+	return llvm_genIR_printlike_dummy(ast, "scanf");
+}
+
 int llvm_genIR_fcall(AST* ast){
-	//  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0))
-	// size_t childCount = ast_get_children_count(ast);
 	int reg1 = LLVM_NEW_INT_REG();
 	NodeData data = ast_get_data(ast);
 	Function* f = data.func.func;
-	// enum Type fret = func_get_return(f);
 	const char* fname = func_get_name(f);
 
-	indent();
-	fprintf(fdump, "; Calling function %s\n", fname);
-
-	fprintf(fdump, "\n");
+	llvm_comment2("+++ %s()\n", fname);
+	llvm_comment2("--- %s()\n", fname);
+	llvm_print("\n");
 
 	return reg1;
 }
 
 void llvm_genIR_paramlist(AST* ast, size_t childCount, int argregs[childCount], enum arghint hint){
-	fprintf(fdump, "(");
+	llvm_print("(");
 	enum Type ttype = ast_get_type(ast_get_child(ast, 0));
 	llvm_genIR_fcall_arg(ttype, argregs[0], hint);
 	if(childCount > 1){
 		for(size_t i=1; i<childCount; i++){
-			fprintf(fdump, ", ");
+			llvm_print(", ");
 			ttype = ast_get_type(ast_get_child(ast, i));
 			llvm_genIR_fcall_arg(ttype, argregs[i], hint);
 		}
 	}
-	fprintf(fdump, ")\n");
+	llvm_print(")\n");
 }
 
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
@@ -856,16 +789,16 @@ void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
 	switch(ttype){
 		case TYPE_FLT:
 			if(hint == ARG_FLT2DOUBLE){
-			      fprintf(fdump, "double %%%d", reg);
+			      llvm_print("double %%%d", reg);
 			      break;
 			}
 		case TYPE_INT:
 		case TYPE_CHAR:
-			fprintf(fdump, "%s %%%d", llvmtname, reg);
+			llvm_print("%s %%%d", llvmtname, reg);
 			break;
 		case TYPE_STR:
 			chcount = count_chars(vector_get_item(stringliterals, reg));
-			fprintf(fdump,
+			llvm_print(
 			    "%s getelementptr inbounds ("
 			    "[%lu x i8], "
 			    "[%lu x i8]* @.str%d, "
@@ -889,18 +822,53 @@ void indent(){
 	}
 }
 
+void llvm_print(const char* fmt, ...){
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(fdump, fmt, args);
+	va_end(args);
+}
+
+void llvm_iprint(const char* fmt, ...){
+	va_list args;
+	va_start(args, fmt);
+	indent();
+	vfprintf(fdump, fmt, args);
+	va_end(args);
+}
+
+void llvm_IR_label(const char* label){
+	llvm_print("%s:\n", label);
+}
+
+void llvm_IR_goto(const char* label){
+	llvm_iprint("br label %%%s\n", label);
+}
+
+void llvm_IR_condgoto(int reg, char* labeltrue, char* labelfalse){
+	// int testreg = LLVM_NEW_INT_REG();
+	// llvm_iprint("br i1 %%%d, label %%%s, label %%%s\n", testreg, iterlabel, escapelabel);
+
+	int testreg = LLVM_NEW_INT_REG();
+
+	// llvm_iprint("%%%d = trunc i32 %%%d to i1\n", testreg, reg);
+	llvm_iprint("%%%d = icmp ne i32 %%%d, 1\n", testreg, reg);
+
+	llvm_iprint("br i1 %%%d, label %%%s, label %%%s\n", testreg, labelfalse, labeltrue);
+}
+
 size_t count_chars(const char* str){
 	size_t count = 0;
 	size_t bytes = strlen(str);
 	for(size_t i=0; i<bytes; i++){
 		if(str[i] == '\\'){
 			switch(str[i+1]){
-			  case 'n':
-			  case 't':
-			    i++;
-			    break;
-			  default:
-			    break;
+				case 'n':
+				case 't':
+					i++;
+					break;
+				default:
+					break;
 			}
 		}
 		count++;
@@ -918,7 +886,23 @@ const char* llvm_get_type(enum Type type){
 			return "float";
 		case TYPE_STR:
 			return "i8*";
+		case TYPE_VOID:
+			return "void";
 		default:
-			return "";
+			assert(0);
 	}
+	return "";
+}
+
+int llvm_get_size(enum Type type){
+	switch(type){
+		case TYPE_INT:
+		case TYPE_FLT:
+			return 4;
+		case TYPE_CHAR:
+			return 1;
+		default:
+			assert(0);
+	}
+	return -1;
 }

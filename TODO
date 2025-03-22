@@ -12,10 +12,11 @@
 * [*] implementar printf
 * [*] testar tudo
 * [*] começar funcoes
-* [ ] if/while (ficou para o dia 22/03)
 
 /* 22/03 */
+* [*] if/while
 * [ ] fazer funcoes
+* [ ] ver qual o suporte do llvm para funções
 * [ ] frame de função
 * [ ] fazer Frames da memoria e guardar ponteiro para Frame atual (para tratar recursividade)
 * [ ] implementar scanf
@@ -25,3 +26,22 @@
 * [ ] terminar arrays
 * [ ] guardar o id do frame das variaveis
 * [ ] implementar ponteiro?
+
+
+AVISOS
+OBS1:
+No IR do LLVM, não há necessidade de criar temporarios para armazenar
+literais; é possível usa-los diretamente nas operações sem que estejam
+armazenados na memoria (o que por sua vez é feito por meio da operação alloca).
+
+No entanto, foi uma escolha minha carregar os literais também na memória. Isso
+permitiu simplificar bruscamente o código, porque não é necessário descobrir
+de alguma forma se o valor em questão está armazenado em registrador ou em
+memória. Isso teve implicações visíveis ao implementar os nós da AST de
+conversão e de IF/WHILE. Nesse sentido, o backend feito REQUER que qualquer
+valor a ser usado seja carregado em um pointer criado pela operação 'alloca'.
+Isso aumenta o número de temporários, mas traz simplificações para o código.
+
+OBS2:
+não é necessário converter explicitamente um valor i32 para i1 antes de
+executar um br, basta dizer que o valor em questão é i1

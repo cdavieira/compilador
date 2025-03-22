@@ -41,6 +41,14 @@ int func_table_add(FuncTable* table, char* name, Scope* scope, enum Type ret, in
 	return 0;
 }
 
+unsigned func_table_get_size(FuncTable* table){
+	return vector_get_size(table->functions);
+}
+
+Function* func_table_get(FuncTable* table, int idx){
+	return vector_get_item(table->functions, idx);
+}
+
 Function* func_table_search(FuncTable* table, char* name){
 	Function* func = (Function*) vector_search(table->functions, name, (int (*)(void*, void*)) func_compare_name);
 	return func;

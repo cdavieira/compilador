@@ -54,6 +54,10 @@ make test testcase=tests/OK
 # OBS: descomente a linha 'CFLAGS += -DDEBUG_AST' do makefile antes!
 make pdf testfile=tests/OK/syntax/func/func-rec.c
 
+# gerar o arquivo .ll (IR da LLVM) correspondente a AST
+# OBS: descomente a linha 'CFLAGS += -DGEN_LLVM' do makefile antes!
+make ll testfile=tests/OK/syntax/func/func-rec.c
+
 # testar o parser para uma entrada qualquer
 ./myparser < test.c
 # ou
