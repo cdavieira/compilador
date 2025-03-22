@@ -23,6 +23,7 @@ typedef enum {
 	NODE_CHR_VAL,
 	NODE_STR_VAL,
 	NODE_ARRAY_VAL,
+	NODE_PTR_VAL,
 
 	/* operators */
 	NODE_MINUS,
@@ -48,7 +49,6 @@ typedef enum {
 	NODE_FUNC,
 	NODE_FUNC_PARAMLIST,
 	NODE_FUNC_BODY,
-	NODE_FUNC_USE,
 	NODE_FUNC_RET,
 	NODE_FCALL,
 

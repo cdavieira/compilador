@@ -1,14 +1,24 @@
-* [ ] talvez a funcao 'llvm_genIR_value' sirva para outros tipos de dado tambem
-* [ ] fazer o dump da string table
-* [ ] talvez substituir a chamada das funcoes 'llvm_genIR_sum/sub/mul/div' pela generica delas
-* [ ] terminar funcoes de expressao
-* [ ] fazer Frames da memoria e guardar ponteiro para Frame atual (para tratar recursividade)
-
-# DOING
+/* ??? */
 * [ ] fazer o bind correto de variaveis do tipo string e array
 * [ ] checar se a redeclaração de uma funcao nao conflita com a lista de parametros
-* [ ] renomear funcoes do parser.y
-* [ ] de preferencia diminuir complexidade no funcionamento das funcoes do parser.y
-* [ ] de preferencia diminuir o numero de variaveis globais
-* [ ] fazer interpreatador minimalista
-* [ ] como ficam os parametros que sao passados por registrador? eles ainda são escritos na memoria virtual?
+
+/* 21/03 */
+* [*] fazer o dump da string table
+* [*] terminar as conversoes
+* [*] terminar as operacoes binarias (<, >)
+* [*] implementar printf
+* [*] testar tudo
+* [*] começar funcoes
+* [ ] if/while (ficou para o dia 22/03)
+
+/* 22/03 */
+* [ ] fazer funcoes
+* [ ] frame de função
+* [ ] fazer Frames da memoria e guardar ponteiro para Frame atual (para tratar recursividade)
+* [ ] implementar scanf
+* [ ] começar arrays
+
+/* 23/03 */
+* [ ] terminar arrays
+* [ ] guardar o id do frame das variaveis
+* [ ] implementar ponteiro?

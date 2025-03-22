@@ -85,6 +85,15 @@ void* vector_search(Vector* arr, void* item, int (*compare)(void*, void*)){
 	return NULL;
 }
 
+ssize_t vector_search_idx(Vector* arr, void* item, int (*compare)(void*, void*)){
+	for(ssize_t i=0; i<arr->size; i++){
+		if(compare(arr->elements[i], item)){
+			return i;
+		}
+	}
+	return -1;
+}
+
 
 
 

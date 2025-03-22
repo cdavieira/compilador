@@ -34,7 +34,7 @@ CFLAGS := -Wall -I$(srcdir)/lib
 # Add debug information about the AST
 # CFLAGS += -DDEBUG_AST
 # Add LLVM IR code gen
-# CFLAGS += -DGEN_LLVM
+CFLAGS += -DGEN_LLVM
 
 
 flex_src := $(srcdir)/src/lexer.yy.c
@@ -104,6 +104,7 @@ ll: clean all
 	./$(parsername) <$(testfile)
 	cp tmp.ll $(notdir $(testfile)).ll
 	rm tmp.ll
+	llc -relocation-model=pic $(notdir $(testfile)).ll
 
 val:
 	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < $(testfile)

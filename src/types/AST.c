@@ -17,6 +17,7 @@ struct AST {
 	Vector* children;
 };
 
+extern Vector* stringliterals;
 
 static FILE* fdump;
 
@@ -104,6 +105,8 @@ void ast_set_data(AST* node, NodeData data){
 	switch(node->kind){
 		case NODE_FUNC:
 		case NODE_FCALL:
+		case NODE_PRINTF:
+		case NODE_SCANF:
 			node->type = func_get_return(data.func.func);
 			node->data = data;
 			node->has_data = 1;
@@ -111,6 +114,7 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
 		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
 			node->type = data.var.var.type;
 			node->data = data;
 			node->has_data = 1;
@@ -124,12 +128,9 @@ void ast_set_data(AST* node, NodeData data){
 		case NODE_MINUS:
 		case NODE_OVER:
 		case NODE_PLUS:
-		case NODE_SCANF:
 		case NODE_FUNC_RET:
-		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
-		case NODE_PRINTF:
 		case NODE_GT:
 		case NODE_NE:
 		case NODE_OR:
@@ -188,7 +189,7 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_OVER:         return "over";
 		case NODE_PLUS:         return "plus";
 		case NODE_TIMES:        return "times";
-		case NODE_MOD:        return "modulus";
+		case NODE_MOD:          return "modulus";
 		case NODE_LT:           return "lt"; 
 		case NODE_GT:           return "gt"; 
 		case NODE_EQ:           return "eq"; 
@@ -200,10 +201,10 @@ char* ast_kind2str(NodeKind kind) {
 		case NODE_SCANF:        return "scanf";
 		case NODE_PRINTF:       return "printf";
 		case NODE_FUNC:         return "function";
-		case NODE_FUNC_USE:     return "funcuse";
-		case NODE_FUNC_BODY:    return "funcbody";
 		case NODE_FCALL:        return "fcall";
+		case NODE_FUNC_BODY:    return "funcbody";
 		case NODE_ARRAY_VAL:    return "array";
+		case NODE_PTR_VAL:    return "ptr";
 		case NODE_I2F:          return "i2f";
 		case NODE_I2C:          return "i2c";
 		case NODE_C2I:          return "c2i";
@@ -230,7 +231,6 @@ int ast_has_literal(AST* node) {
 		case NODE_PLUS:
 		case NODE_SCANF:
 		case NODE_FUNC:
-		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
@@ -255,6 +255,7 @@ int ast_has_literal(AST* node) {
 		case NODE_WHILE:
 		case NODE_NOCONV:
 		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY:
 		case NODE_FCALL:
@@ -269,6 +270,7 @@ int ast_has_var(AST* node) {
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
 		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
 		    return 1;
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
@@ -293,7 +295,6 @@ int ast_has_var(AST* node) {
 		case NODE_SCANF:
 		case NODE_PRINTF:
 		case NODE_FUNC:
-		case NODE_FUNC_USE:
 		case NODE_I2F:
 		case NODE_I2C:
 		case NODE_C2I:
@@ -324,7 +325,6 @@ Literal* ast_get_literal(AST* node){
 		case NODE_PLUS:
 		case NODE_SCANF:
 		case NODE_FUNC:
-		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
@@ -337,6 +337,7 @@ Literal* ast_get_literal(AST* node){
 		case NODE_VAR_DECL:
 		case NODE_VAR_USE:
 		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
 		case NODE_IF:
@@ -363,6 +364,7 @@ Variable* ast_get_variable(AST* node){
 		case NODE_VAR_USE:
 		case NODE_VAR_DECL:
 		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
 			return &node->data.var.var;
 		case NODE_ASSIGN:
 		case NODE_CHR_VAL:
@@ -375,7 +377,6 @@ Variable* ast_get_variable(AST* node){
 		case NODE_PLUS:
 		case NODE_SCANF:
 		case NODE_FUNC:
-		case NODE_FUNC_USE:
 		case NODE_STR_VAL:
 		case NODE_TIMES:
 		case NODE_PRINTF:
@@ -462,13 +463,16 @@ static void ast_export_dot_rec(AST *node) {
 	if(kind == NODE_ARRAY_VAL){
 		fprintf(fdump, "#%d", node->data.var.var.qualifier);
 	}
+	else if(kind == NODE_PTR_VAL){
+		// fprintf(fdump, "");
+	}
 
 	if(ast_has_literal(node)) {
 		if(node->kind == NODE_FLT_VAL) {
 			fprintf(fdump, "%.2f", data.lit.value.f);
 		}
 		else if(node->kind == NODE_STR_VAL) {
-			fprintf(fdump, "@%s", data.lit.value.s);
+			fprintf(fdump, "@%d", data.lit.value.i);
 		}
 		else if(node->kind == NODE_CHR_VAL) {
 			fprintf(fdump, "%c", data.lit.value.c);
@@ -482,14 +486,15 @@ static void ast_export_dot_rec(AST *node) {
 	//end of label
 
 	AST* child;
+	// printf("%lu\n", count);
 	for(int i = 0; i < count; i++) {
 		child = ast_get_child(node, i);
 		if(child != NULL){
 		  ast_export_dot_rec(child);
+		  fprintf(fdump, "node%d -> node%d;\n", node->id, child->id);
 		}
 		else{
-		  fprintf(stdout, "node%d is null\n", child->id);
+		  fprintf(stdout, "node%d is null from node%d\n", i, node->id);
 		}
-		fprintf(fdump, "node%d -> node%d;\n", node->id, child->id);
 	}
 }

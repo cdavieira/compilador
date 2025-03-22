@@ -15,10 +15,11 @@
 #define CMD(NAME)       RETURN(NAME);
 #define ERRO            printf("LEXICAL ERROR (%d): Unknown symbol %s\n", yylineno, yytext);
 
-static Vector* tokens;
+Vector* stringliterals;
+static Vector* varids;
 
 static int mystrcmp(void* s1, void* s2);
-static char* alloc_str(char* src);
+static int alloc_str(char* src);
 static void save_id(void);
 static void save_string(void);
 static void save_int(void);
@@ -137,42 +138,52 @@ macro           ^#.*
 .              { ERRO }
 %%
 void lexer_init(void){
-	tokens = vector_new(32); //all tokens dynamically alloc'd by the lexer
+	stringliterals = vector_new(32); //all strings dynamically alloc'd by the lexer
+	varids = vector_new(32); //all ids dynamically alloc'd by the lexer
 }
 
 void lexer_deinit(void){
-	vector_destroy(&tokens, free);
+	vector_destroy(&stringliterals, free);
+	vector_destroy(&varids, free);
 }
 
 static int mystrcmp(void* s1, void* s2){
 	return strcmp((char*)s1, (char*)s2) == 0;
 }
 
-static char* alloc_str(char* src){
-	char* string = vector_search(tokens, src, mystrcmp);
+static char* alloc_id(char* src){
+	char* string = vector_search(varids, src, mystrcmp);
 	if(string == NULL){
 		string = strdup(src);
-		vector_append(tokens, string);
+		vector_append(varids, string);
 	}
 	return string;
 }
 
+static int alloc_str(char* src){
+	size_t size = strlen(src)-1;
+	char srcclean[size];
+	strncpy(srcclean, src+1, size-1);
+	srcclean[size-1] = '\0';
+	int idx = vector_search_idx(stringliterals, srcclean, mystrcmp);
+	if(idx == -1){
+		char* string = strdup(srcclean);
+		idx = vector_append(stringliterals, string);
+	}
+	return idx;
+}
+
 static void save_id(void){
-	char* str = alloc_str(yytext);
+	char* str = alloc_id(yytext);
 	yylval.str = str;
 }
 
 static void save_string(void){
-	char* str = alloc_str(yytext);
-	int leng = strlen(str);
-	if(leng >= 1 && str[0] == '"'){
-		str[0] = ' ';
-	}
-	if(leng >= 2 && str[leng-1] == '"'){
-		str[leng-1] = ' ';
-	}
+	int idx = alloc_str(yytext);
+	// char* str = vector_get_item(stringliterals, idx);
 	yylval.l.type = TYPE_STR;
-	yylval.l.value.s = str;
+	// yylval.l.value.s = str;
+	yylval.l.value.i = idx;
 }
 
 static void save_int(void){
@@ -187,5 +198,5 @@ static void save_flt(void){
 
 static void save_chr(void){
 	yylval.l.type = TYPE_CHAR;
-	yylval.l.value.c = yytext[0];
+	yylval.l.value.c = yytext[1];
 }

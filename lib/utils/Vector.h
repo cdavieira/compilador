@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stddef.h>
+#include <stdio.h>
 
 /* some notes about Vector
  * the append, pop, is_empty, is_full and getter functions aren't null protected
@@ -19,6 +19,7 @@ size_t vector_get_capacity(const Vector * const arr);
 void* vector_get_item(Vector* arr, size_t idx);
 
 void* vector_search(Vector* arr, void* item, int (*compare)(void*, void*));
+ssize_t vector_search_idx(Vector* arr, void* item, int (*compare)(void*, void*));
 int vector_append(Vector* const arr, void* item);
 void* vector_pop(Vector* const arr);
 

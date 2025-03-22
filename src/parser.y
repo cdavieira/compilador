@@ -248,6 +248,7 @@ union Token {
 %nterm <ast> declarator
 %nterm <ast> declarator_basic
 %nterm <ast> declarator_array
+%nterm <ast> declarator_ptr
 %nterm <ast> declaration_func
 %nterm <ast> func_paramlist
 %nterm <ast> func_params
@@ -297,6 +298,7 @@ declarators:
 declarator:
   declarator_basic { $$ = $1; }
 | declarator_array { $$ = $1; }
+| declarator_ptr   { $$ = $1; }
 ;
 
 declarator_basic:
@@ -309,6 +311,11 @@ declarator_array:
 | ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY RCURLY       { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
 | ID LBRACKET INTVAL RBRACKET ASSIGN LCURLY exprs RCURLY { $$ = add_var_declaration($1, vartype,  $3.value.i, NULL);  }
 | ID LBRACKET INTVAL RBRACKET ASSIGN STRING              { $$ = add_var_declaration($1, TYPE_STR, $3.value.i, NULL); }
+;
+
+declarator_ptr:
+  STAR ID             { $$ = add_var_declaration($2, vartype, QUALIFIER_POINTER, NULL);  }
+| STAR ID ASSIGN expr { $$ = add_var_declaration($2, vartype, QUALIFIER_POINTER, $4); }
 ;
 
 
@@ -456,8 +463,8 @@ type_specifier:
 void parser_init(void){
 	functable = func_table_new();
 	scope_manager = scope_manager_new();
-	func_table_add(functable, "printf", scope_manager_get_current_scope(scope_manager), TYPE_VOID, 10, 1);
-	func_table_add(functable, "scanf", scope_manager_get_current_scope(scope_manager), TYPE_VOID, 10, 1);
+	func_table_add(functable, "printf", scope_manager_get_current_scope(scope_manager), TYPE_INT, 10, 1);
+	func_table_add(functable, "scanf", scope_manager_get_current_scope(scope_manager), TYPE_INT, 10, 1);
 	funcargs = vector_new(12);
 	ast_block = calloc(1, sizeof(int));
 	ast_block_history = stack_new(12);
@@ -555,11 +562,21 @@ AST* add_var_declaration(char* name, enum Type type, enum Qualifier qualifier, A
 	ast_set_data(ast, data);
 
 	//making sure we are dealing with either a basic type or with an array type
-	assert((qualifier == QUALIFIER_BASIC) || (qualifier != QUALIFIER_POINTER));
+	// assert((qualifier == QUALIFIER_BASIC) || (qualifier != QUALIFIER_POINTER));
 
 	if(qualifier == QUALIFIER_BASIC){
 		if(init != NULL){
-			ast_add_child(ast, init);
+			TypeData data = typesys_assign(type, ast_get_type(init));
+			AST* conv = ast_manager_add_conv(init, data.right);
+			ast_add_child(ast, conv);
+		}
+	}
+	else if(qualifier == QUALIFIER_POINTER){
+		if(init != NULL){
+			AST* ptrval = ast_new_node(NODE_PTR_VAL);
+			ast_set_data(ptrval, data);
+			ast_add_child(ptrval, init);
+			ast_add_child(ast, ptrval);
 		}
 	}
 	else{ //array
@@ -759,7 +776,6 @@ AST* ast_manager_add_conv(AST* raw, Conversion conv){
 			break;
 		default:
 			kind = NODE_NOCONV;
-			data.lit.type = ast_get_type(raw);
 	}
 	if(kind != NODE_NOCONV){
 		converted = ast_new_subtree(kind, raw, NULL);
@@ -818,7 +834,10 @@ AST* ast_manager_assign_stmt(char* name, AST* expr){
 	NodeData data;
 	data.lit.type = ast_get_type(var);
 	ast_add_child(stmt, var);
-	ast_add_child(stmt, expr);
+
+	TypeData tdata = typesys_assign(data.lit.type, ast_get_type(expr));
+	AST* conv = ast_manager_add_conv(expr, tdata.right);
+	ast_add_child(stmt, conv);
 	ast_set_data(stmt, data);
 	return stmt;
 }
@@ -828,7 +847,16 @@ AST* ast_manager_fcall(char* funcname){
 	check_function_call(funcname);
 	fcall_active = 0; 
 
-	AST* node  = ast_new_node(NODE_FCALL);
+	int isprintf = strcmp(funcname, "printf") == 0;
+	int isscanf = strcmp(funcname, "scanf") == 0;
+	NodeKind kind = NODE_FCALL;
+	if(isprintf){
+	      kind = NODE_PRINTF;
+	}
+	else if(isscanf){
+	      kind = NODE_SCANF;
+	}
+	AST* node = ast_new_node(kind);
 	NodeData data;
 	Function* f = func_table_search(functable, funcname);
 	const int nargs = vector_get_size(funcargs);
@@ -886,13 +914,23 @@ AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
 }
 
 AST* ast_manager_add_funcret(AST* expr){
-	enum Type type = expr == NULL ? TYPE_VOID : ast_get_type(expr);
+	if(expr == NULL){
+		check_function_return(TYPE_VOID);
+		AST* stmt = ast_new_node(NODE_FUNC_RET);
+		NodeData data;
+		data.lit.type = TYPE_VOID;
+		ast_set_data(stmt, data);
+		return stmt;
+	}
+
+	TypeData tdata = typesys_assign(retvartype, ast_get_type(expr));
+	AST* conv = ast_manager_add_conv(expr, tdata.right);
+
+	enum Type type = ast_get_type(conv);
 	check_function_return(type);
 
 	AST* stmt = ast_new_node(NODE_FUNC_RET);
-	if(expr != NULL){
-		ast_add_child(stmt, expr);
-	}
+	ast_add_child(stmt, conv);
 	NodeData data;
 	data.lit.type = type;
 	ast_set_data(stmt, data);
