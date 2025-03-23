@@ -966,9 +966,21 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 			data.block.scope = func_get_scope(f);
 			ast_set_data(fblock, data);
 		}
-		//Although needed, we don't have to check for type == TYPE_VOID, because the grammar enforces that
 		if(ast_manager_missing_retstmt(fblock)){
-			ast_add_child(fblock, ast_manager_add_funcret(NULL));
+			if(type == TYPE_VOID){
+				ast_add_child(fblock, ast_manager_add_funcret(NULL));
+			}
+			else{
+				//i mean, if a function with a return type is
+				//missing the last return, are we supposed to
+				//add a return? we definitely can, i just
+				//don't know if we should
+				Literal l;
+				memset(&l, 0, sizeof(Literal));
+				l.type = type;
+				AST* retexpr = ast_manager_from_literal(&l);
+				ast_add_child(fblock, ast_manager_add_funcret(retexpr));
+			}
 		}
 		ast_add_child(body, fblock);
 	}

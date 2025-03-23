@@ -26,7 +26,7 @@
 
 /* 23/03 */
 * [*] recursão de funções implementada e testada
-* [ ] consertar inicialização de variaveis globais
+* [*] consertar inicialização de variaveis globais
 * [ ] implementar scanf
 * [ ] arrays
 
@@ -48,3 +48,16 @@ Isso aumenta o número de temporários, mas traz simplificações para o código
 OBS2:
 não é necessário converter explicitamente um valor i32 para i1 antes de
 executar um br, basta dizer que o valor em questão é i1
+
+
+COMENTÁRIOS ALEATÓRIOS
+O fato de eu ter pulado a etapa de escrita do interpretador fez com que muitos
+bugs que antes teriam sido descobertos nessa etapa fossem descobertos na etapa
+seguinte (do backend com LLVM). Isso fez com que eu tivesse de fazer mais
+mudanças do que seriam necessárias no arquivo 'parser.y'. Isso foi
+especialmente ruim porque dificultou a detecção de bugs na etapa do backend,
+visto que não se sabia a princípio se o problema estaria na implementação do
+código em si do backend ou se estaria no código do parser.y. Felizmente foi
+possível chegar a causa raiz dos problemas por meio de uma depuração cautelosa
+e demorada, que no fim das contas foi mais cansativa e tomou mais tempo do que
+deveria, do que se o interpretador tivesse sido feito.

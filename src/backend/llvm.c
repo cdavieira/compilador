@@ -250,7 +250,7 @@ int llvm_genIR_recursive(AST* root){
 	NodeKind kind = ast_get_kind(root);
 	unsigned childCount = ast_get_children_count(root);
 
-	printf("Node %s visited\n", ast_kind2str(kind));
+	// printf("Node %s visited\n", ast_kind2str(kind));
 
 	switch(kind){
 		// Expressions
@@ -344,12 +344,12 @@ int llvm_genIR_recursive(AST* root){
 		// Node kinds which don't need to be handled (only their children)
 		case NODE_PROGRAM: //has 0 or 1 child
 		case NODE_VAR_LIST: //has 1 or more children
-			printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
+			// printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
 			for(unsigned i=0; i<childCount; i++){
 				llvm_genIR_recursive(ast_get_child(root, i));
 			}
 			break;
-			printf("Node %s: transverse completed\n", ast_kind2str(kind));
+			// printf("Node %s: transverse completed\n", ast_kind2str(kind));
 	}
 
 	return -1;
@@ -487,21 +487,40 @@ int llvm_genIR_vardecl(AST* node){
 	int llvmsize = llvm_get_size(vtype);
 	int has_val = count != 0;
 	AST* ininode = has_val ? ast_get_child(node, 0) : NULL;
-	int reg1 = has_val ? llvm_genIR_recursive(ininode) : -1;
+	int inglobalscope = in_global_scope();
+	int reg1 = !inglobalscope && has_val ? llvm_genIR_recursive(ininode) : -1;
 	int reg2 = LLVM_NEW_INT_REG();
 
 	llvm_comment2("Declaring %s variable", llvmtype);
 
+	Literal* l;
 	switch(vtype){
 		case TYPE_FLT:
 		case TYPE_INT:
 		case TYPE_CHAR:
 			framemanager_write(node, reg2);
-			if(in_global_scope()){
-				llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
-				if(has_val){
-					//NOTE: THIS MIGHT BE WRONG
-					llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+			//i mean, what can you do about it
+			//it is what it is
+			if(inglobalscope){
+				if(ininode && ast_has_literal(ininode)){
+					l = ast_get_literal(ininode);
+					switch(l->type){
+						case TYPE_INT:
+							llvm_iprint("@g%d = global %s %d, align %d\n", reg2, llvmtype, l->value.i, llvmsize);
+							break;
+						case TYPE_FLT:
+							llvm_iprint("@g%d = global %s %f, align %d\n", reg2, llvmtype, l->value.f, llvmsize);
+							break;
+						case TYPE_CHAR:
+							llvm_iprint("@g%d = global %s %c, align %d\n", reg2, llvmtype, l->value.c, llvmsize);
+							break;
+						default:
+							llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
+							break;
+					}
+				}
+				else{
+					llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
 				}
 			}
 			else{
@@ -701,7 +720,15 @@ void llvm_genIR_if(AST* ast){
 
 	llvm_IR_condgoto(reg, iflabel, elsechild ? elselabel : escapelabel);
 	llvm_IR_label(iflabel);
-	llvm_genIR_recursive(ifchild);
+	if(ifchild){
+		//since its the 'block' non terminal token (from parser.y)
+		//which gives birth to 'ifchild', 'ifchild' could be NULL
+		//(because 'block' can be NULL). This is true for 'elsechild'
+		//as well and any other AST node where that's the case. Sorry
+		//for only pointing that out here lmao (if this interests you
+		//for any reason).
+		llvm_genIR_recursive(ifchild);
+	}
 	llvm_IR_goto(escapelabel);
 
 	if(elsechild){
@@ -735,7 +762,7 @@ void llvm_genIR_while(AST* ast){
 	llvm_IR_condgoto(cmpreg, bodylabel, escapelabel);
 
 	llvm_IR_label(bodylabel);
-	llvm_genIR_recursive(block);
+	llvm_genIR_block(block);
 
 	llvm_comment1("looping");
 	llvm_IR_goto(condlabel);
@@ -995,6 +1022,9 @@ void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
 }
 
 void llvm_genIR_block(AST* block){
+	if(block == NULL){
+		return ;
+	}
 	framemanager_push(block);
 	llvm_comment2("+++ Block %d entered\n", framemanager_current_block());
 
