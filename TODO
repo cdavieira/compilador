@@ -2,10 +2,12 @@
 * [ ] fazer o bind correto de variaveis do tipo string e array
 * [ ] checar se a redeclaração de uma funcao nao conflita com a lista de parametros
 * [ ] remove code ambiguity in llvm.c (there's a lot!)
-* [ ] criar llvm_printf (que se encarregará de chamar a funcao indent())
-* [ ] criar macro/funcao que encapsule a adição de comentários no arquivo .ll final
+* [X] criar llvm_printf (que se encarregará de chamar a funcao indent())
+* [X] criar macro/funcao que encapsule a adição de comentários no arquivo .ll final
 * [ ] fazer algo como: llvm_new_reg(ltype) em vez do macro podre
 * [ ] implementar ponteiro?
+* [ ] criar função separada para o funcbody lol
+* [ ] criar função separada no parser.y que se encarregue de criar um NODE_BLOCK
 
 /* 21/03 */
 * [*] fazer o dump da string table
@@ -20,9 +22,10 @@
 * [*] fazer dump das funcoes definidas pelo programador
 * [*] fazer definição de multiplas funcoes
 * [*] fazer chamada de funcoes
-* [*] fazer frame/context manager (recursividade)
+* [*] fazer frame/context manager (para recursividade, ainda não 100% funcional)
 
 /* 23/03 */
+* [*] recursão de funções implementada e testada
 * [ ] consertar inicialização de variaveis globais
 * [ ] implementar scanf
 * [ ] arrays

@@ -336,7 +336,7 @@ func_paramlist:
 
 func_params:
   func_param                   { $$ = ast_manager_add_param_decl($$, $1, 1); }
-| func_param COMMA func_params { $$ = ast_manager_add_param_decl($3, $1, 0); }
+| func_params COMMA func_param { $$ = ast_manager_add_param_decl($1, $3, 0); }
 ;
 
 func_param:
@@ -460,8 +460,8 @@ fcaller:
 ;
 
 exprs:
-  expr { if(fcall_active == 1){ vector_append(funcargs, $1) ; }; }
-| expr { if(fcall_active == 1){ vector_append(funcargs, $1) ; }; } COMMA exprs
+  expr  { if(fcall_active == 1){ vector_append(funcargs, $1) ; }; }
+| exprs COMMA expr { if(fcall_active == 1){ vector_append(funcargs, $3) ; }; }
 ;
 
 type_specifier:
@@ -958,17 +958,20 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 	AST* ast = ast_new_node(NODE_FUNC);
 	AST* head = params != NULL ? params : ast_new_node(NODE_FUNC_PARAMLIST);
 	AST* body = ast_new_node(NODE_FUNC_BODY); 
+	NodeData data;
+	Function* f = func_table_search(functable, funcname);
 	if(function_definition){
-		fblock = fblock == NULL ? ast_new_node(NODE_BLOCK) : fblock;
+		if(fblock == NULL){
+			fblock = ast_new_node(NODE_BLOCK);
+			data.block.scope = func_get_scope(f);
+			ast_set_data(fblock, data);
+		}
 		//Although needed, we don't have to check for type == TYPE_VOID, because the grammar enforces that
 		if(ast_manager_missing_retstmt(fblock)){
 			ast_add_child(fblock, ast_manager_add_funcret(NULL));
 		}
 		ast_add_child(body, fblock);
 	}
-
-	NodeData data;
-	Function* f = func_table_search(functable, funcname);
 	data.func.func = f;
 	ast_add_child(ast, head);
 	ast_add_child(ast, body);

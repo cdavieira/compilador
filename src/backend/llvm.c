@@ -250,7 +250,7 @@ int llvm_genIR_recursive(AST* root){
 	NodeKind kind = ast_get_kind(root);
 	unsigned childCount = ast_get_children_count(root);
 
-	// printf("Node %s visited\n", ast_kind2str(kind));
+	printf("Node %s visited\n", ast_kind2str(kind));
 
 	switch(kind){
 		// Expressions
@@ -306,8 +306,6 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_FUNC_RET:
 			return llvm_genIR_function_return(root);
 		case NODE_FCALL:
-			// llvm_comment1("TODO: fcall\n");
-			// break;
 			return llvm_genIR_fcall(root);
 		case NODE_SCANF:
 			return llvm_genIR_scanf(root);
@@ -337,21 +335,21 @@ int llvm_genIR_recursive(AST* root){
 
 
 		// Node kinds handled exclusively by their parents
-		case NODE_FUNC_PARAMLIST:
 		case NODE_NOCONV: //this type of node does not get included in the AST
+		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY: //has 0 or 1 children
 			break ;
 
 
 		// Node kinds which don't need to be handled (only their children)
-		case NODE_FUNC_BODY: //has 0 or 1 children
 		case NODE_PROGRAM: //has 0 or 1 child
 		case NODE_VAR_LIST: //has 1 or more children
-			// printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
+			printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
 			for(unsigned i=0; i<childCount; i++){
 				llvm_genIR_recursive(ast_get_child(root, i));
 			}
 			break;
-			// printf("Node %s: transverse completed\n", ast_kind2str(kind));
+			printf("Node %s: transverse completed\n", ast_kind2str(kind));
 	}
 
 	return -1;
@@ -801,7 +799,7 @@ void llvm_genIR_function_definition(AST* fnode){
 	else if(nparams == 0){
 		llvm_print("{\n");
 		indentLevel++;
-		llvm_genIR_recursive(fbody);
+		llvm_genIR_block(fblock);
 		indentLevel--;
 		llvm_print("}\n\n");
 	}
@@ -854,7 +852,14 @@ int llvm_genIR_function_return(AST* ret){
 
 	int reg = llvm_genIR_recursive(ast_get_child(ret, 0));
 	llvm_iprint("ret %s %%%d\n\n", llvmtypename, reg);
-	return reg;
+
+	//well, apparently this is needed for recursive calls.
+	//in other words, if we return 'reg', then the return value for this
+	//fcall won't be in an independet/separate temporary register, which
+	//will violate the SSA policy
+	int resreg = LLVM_NEW_INT_REG();
+
+	return resreg;
 }
 
 int llvm_genIR_printlike_dummy(AST* ast, const char* fname){
@@ -928,19 +933,20 @@ int llvm_genIR_fcall(AST* ast){
 		/* writing llvm ir funccall */
 		if(fret != TYPE_VOID){
 			regret = LLVM_NEW_INT_REG();
-			llvm_iprint("%%%d = ", regret);
+			llvm_iprint("%%%d = call %s @%s(", regret, fretname, fname);
 		}
-
-		llvm_iprint("call %s @%s(", fretname, fname);
+		else{
+			llvm_iprint("call %s @%s(", fretname, fname);
+		}
 
 		//writing paramlist
 		argtype = ast_get_type(ast_get_child(ast, 0));
-		llvm_genIR_fcall_arg(argtype, argregs[0], ARG_FLT2DOUBLE);
+		llvm_genIR_fcall_arg(argtype, argregs[0], ARG_NOHINT);
 		if(childCount > 1){
 			for(size_t i=1; i<childCount; i++){
 				llvm_print(", ");
 				argtype = ast_get_type(ast_get_child(ast, i));
-				llvm_genIR_fcall_arg(argtype, argregs[i], ARG_FLT2DOUBLE);
+				llvm_genIR_fcall_arg(argtype, argregs[i], ARG_NOHINT);
 			}
 		}
 		llvm_print(")\n");
@@ -948,9 +954,11 @@ int llvm_genIR_fcall(AST* ast){
 	else{
 		if(fret != TYPE_VOID){
 			regret = LLVM_NEW_INT_REG();
-			llvm_iprint("%%%d = ", regret);
+			llvm_iprint("%%%d = call %s @%s()\n", regret, fretname, fname);
 		}
-		llvm_iprint("call %s @%s()\n", fretname, fname);
+		else{
+			llvm_iprint("call %s @%s()\n", fretname, fname);
+		}
 	}
 
 	llvm_comment2("--- %s()", fname);
@@ -1135,7 +1143,7 @@ int framemanager_read(AST* var){
 	Stack* blockframe = llvm_memory.blockframes[scopeid];
 	BlockFrame* frame = stack_top(blockframe);
 	Variable* v = ast_get_variable(var);
-	// printf("var %s (scope=%d) should be at %d\n", v->name, scopeid, v->reladdr);
+	// printf("var %s (scope=%d) should be at %d... using reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
 	return frame->addrs[v->reladdr];
 }
 
@@ -1147,6 +1155,7 @@ void framemanager_write(AST* var, int reg){
 
 	Variable* v = ast_get_variable(var);
 	frame->addrs[v->reladdr] = reg;
+	// printf("var %s (scope=%d) should be at %d... writing reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
 }
 
 void framemanager_push(AST* block){
