@@ -229,9 +229,6 @@ int llvm_genIR_fcall(AST* ast);
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint);
 void llvm_genIR_block(AST* block);
 
-/* arrays */
-// int llvm_genIR_arrayval(AST* node);
-
 /* helpers */
 void indent();
 void llvm_print(const char* fmt, ...);
@@ -583,7 +580,7 @@ int llvm_genIR_varuse(AST* node){
 		int elemreg = LLVM_NEW_INT_REG();
 		regres = LLVM_NEW_INT_REG();
 
-		llvm_comment2("Reading %s variable (array=%d) from memory", llvm_type, isarray);
+		llvm_comment2("Reading %s array from memory", llvm_type, isarray);
 		if(var_in_global_scope(node)){
 			// llvm_iprint("%%%d = load i32, ptr %%%d, align %d\n", tmpreg, idxreg, llvm_size);
 			llvm_iprint("%%%d = getelementptr inbounds %s, ptr @g%d, i32 %%%d\n", elemreg, llvm_type, framemanager_read(node), idxreg);
@@ -597,7 +594,7 @@ int llvm_genIR_varuse(AST* node){
 	}
 	else{
 
-		llvm_comment2("Reading %s variable (array=%d) from memory", llvm_type, isarray);
+		llvm_comment2("Reading %s variable from memory", llvm_type);
 		regres = LLVM_NEW_INT_REG();
 		if(var_in_global_scope(node)){
 			llvm_iprint("%%%d = load %s, ptr @g%d, align %d\n", regres, llvm_type, framemanager_read(node), llvm_size);
@@ -636,7 +633,7 @@ int llvm_genIR_assign(AST* node){
 		llvm_comment2("Writing to %s variable (%s, array=%d) in memory", llvm_type, var->name, isarray);
 		if(var_in_global_scope(lhs)){
 			llvm_iprint("%%%d = getelementptr inbounds %s, ptr @g%d, i32 %%%d\n", elemreg, llvm_type, lhsreg, idxreg);
-			llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvm_type, rhsreg, elemreg, llvm_size);
+			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvm_type, rhsreg, elemreg, llvm_size);
 		}
 		else{
 			llvm_iprint("%%%d = getelementptr inbounds %s, ptr %%%d, i32 %%%d\n", elemreg, llvm_type, lhsreg, idxreg);
