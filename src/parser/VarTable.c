@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "parser/VarTable.h"
+#include "types/Variable.h"
 #include "utils/Vector.h"
 
 struct VarTable {
@@ -32,6 +33,10 @@ int vartable_add(
 	var->type = type;
 	var->uid = uid;
 	var->reladdr = vector_append(vt->t, var);
+	//for arrays
+	// for(int i=1; i<qualifier; i++){
+	// 	vartable_add(vt, s, line, type, QUALIFIER_BASIC, uid);
+	// }
 	return var->reladdr;
 }
 

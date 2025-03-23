@@ -41,6 +41,14 @@
 //on if stmts
 //https://llvm.org/docs/LangRef.html#br-instruction
 
+//on array constants
+//https://llvm.org/docs/LangRef.html#complex-constants
+
+//on array type
+//https://llvm.org/docs/LangRef.html#array-type
+
+//ona array access
+//https://llvm.org/docs/LangRef.html#getelementptr-instruction
 
 #include "backend/llvm.h"
 // #include "parser/VarTable.h"
@@ -165,10 +173,13 @@ FrameManager llvm_memory;
 void framemanager_init(void);
 void framemanager_destroy(void);
 int framemanager_read(AST* var);
+// int framemanager_readarray(AST* var, int idx);
 void framemanager_write(AST* var, int reg);
+// void framemanager_writearray(AST* var, int idx, int reg);
 void framemanager_push(AST* block);
 void framemanager_pop(AST* block);
 int framemanager_current_block(void);
+int framemanager_print(void);
 int in_global_scope();
 int var_in_global_scope(AST* var);
 BlockFrame* frame_new(unsigned sz);
@@ -217,6 +228,9 @@ int llvm_genIR_scanf(AST* ast);
 int llvm_genIR_fcall(AST* ast);
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint);
 void llvm_genIR_block(AST* block);
+
+/* arrays */
+// int llvm_genIR_arrayval(AST* node);
 
 /* helpers */
 void indent();
@@ -290,13 +304,17 @@ int llvm_genIR_recursive(AST* root){
 			return llvm_genIR_and(root);
 
 
-		// Simple variables
+		// variables (simple and arrays)
 		case NODE_ASSIGN:
 			return llvm_genIR_assign(root);
 		case NODE_VAR_USE:
 			return llvm_genIR_varuse(root);
 		case NODE_VAR_DECL:
 			return llvm_genIR_vardecl(root);
+		case NODE_PTR_VAL:
+			llvm_comment1("TODO: Loading ptr val\n");
+			return -1;
+
 
 
 		// Functions
@@ -316,15 +334,6 @@ int llvm_genIR_recursive(AST* root){
 			return -1;
 
 
-		// Arrays (compound variables)
-		case NODE_ARRAY_VAL:
-			llvm_comment1("TODO: Loading array val\n");
-			return -1;
-		case NODE_PTR_VAL:
-			llvm_comment1("TODO: Loading ptr val\n");
-			return -1;
-
-
 		// C statements
 		case NODE_IF:
 			llvm_genIR_if(root);
@@ -335,6 +344,7 @@ int llvm_genIR_recursive(AST* root){
 
 
 		// Node kinds handled exclusively by their parents
+		case NODE_ARRAY_VAL:
 		case NODE_NOCONV: //this type of node does not get included in the AST
 		case NODE_FUNC_PARAMLIST:
 		case NODE_FUNC_BODY: //has 0 or 1 children
@@ -375,21 +385,19 @@ void llvm_genIR_strtable(void){
 		bytes = strlen(str);
 		llvm_print("@.str%lu = private unnamed_addr constant [%lu x i8] c\"", i, sz + 1);
 		for(size_t j=0; j<bytes; j++){
-			if(str[j] == '\\'){
-				switch(str[j+1]){
-					case 'n':
-						llvm_print("\\%02X", '\n');
-						break;
-					case 't':
-						llvm_print("\\%02X", '\t');
-						break;
-					default:
-						break;
-				}
-				j++;
-			}
-			else{
+			if(str[j] != '\\'){
 				llvm_print("%c", str[j]);
+				continue;
+			}
+			switch(str[++j]){
+				case 'n':
+					llvm_print("\\%02X", '\n');
+					break;
+				case 't':
+					llvm_print("\\%02X", '\t');
+					break;
+				default:
+					break;
 			}
 		}
 		llvm_print("\\00\", align 1\n");
@@ -481,122 +489,175 @@ int llvm_genIR_conv(const char* opcode, int fromreg, enum Type from, enum Type t
 
 int llvm_genIR_vardecl(AST* node){
 	unsigned count = ast_get_children_count(node);
-	enum Type vtype = ast_get_type(node);
+	enum Type node_type = ast_get_type(node);
+	const char* llvm_type = llvm_get_type(node_type);
+	int llvm_size = llvm_get_size(node_type);
 
-	const char* llvmtype = llvm_get_type(vtype);
-	int llvmsize = llvm_get_size(vtype);
 	int has_val = count != 0;
 	AST* ininode = has_val ? ast_get_child(node, 0) : NULL;
+
 	int inglobalscope = in_global_scope();
-	int reg1 = !inglobalscope && has_val ? llvm_genIR_recursive(ininode) : -1;
-	int reg2 = LLVM_NEW_INT_REG();
+	int isarray = has_val && (ast_get_kind(ininode) == NODE_ARRAY_VAL);
+	int array_has_init = isarray ? ast_get_children_count(ininode) > 0 : 0;
 
-	llvm_comment2("Declaring %s variable", llvmtype);
+	int reginit = !inglobalscope && has_val ? llvm_genIR_recursive(ininode) : -1;
+	int regres = LLVM_NEW_INT_REG();
 
-	Literal* l;
-	switch(vtype){
-		case TYPE_FLT:
-		case TYPE_INT:
-		case TYPE_CHAR:
-			framemanager_write(node, reg2);
-			//i mean, what can you do about it
-			//it is what it is
-			if(inglobalscope){
-				if(ininode && ast_has_literal(ininode)){
-					l = ast_get_literal(ininode);
-					switch(l->type){
-						case TYPE_INT:
-							llvm_iprint("@g%d = global %s %d, align %d\n", reg2, llvmtype, l->value.i, llvmsize);
-							break;
-						case TYPE_FLT:
-							llvm_iprint("@g%d = global %s %f, align %d\n", reg2, llvmtype, l->value.f, llvmsize);
-							break;
-						case TYPE_CHAR:
-							llvm_iprint("@g%d = global %s %c, align %d\n", reg2, llvmtype, l->value.c, llvmsize);
-							break;
-						default:
-							llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
-							break;
-					}
-				}
-				else{
-					llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
-				}
-			}
-			else{
-				llvm_iprint("%%%d = alloca %s, align %d\n", reg2, llvmtype, llvmsize);
-				if(has_val){
-					llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
-				}
-			}
-			break;
-		default:
+	llvm_comment2("Declaring %s variable (array=%d, global=%d)", llvm_type, isarray, inglobalscope);
+
+	if(node_type != TYPE_FLT && node_type != TYPE_INT && node_type != TYPE_CHAR){
+	    assert(0);
+	}
+
+	framemanager_write(node, regres);
+	if(isarray && inglobalscope){ //array in global scope
+		NodeData adata = ast_get_data(ininode);
+		unsigned nelems = adata.var.var.qualifier;
+		if(array_has_init){ //not supported for now
+			//@Z = global [2 x ptr] [ ptr @X, ptr @Y ]
 			assert(0);
-			break;
+		}
+		else{
+			llvm_iprint("@g%d = global [%u x %s] zeroinitializer, align %d\n", regres, nelems, llvm_type, llvm_size);
+		}
+	}
+	else if(isarray && !inglobalscope){ //array in local scope
+		NodeData adata = ast_get_data(ininode);
+		unsigned nelems = adata.var.var.qualifier;
+		if(array_has_init){ //not supported for now
+			assert(0);
+		}
+		else{
+			llvm_iprint("%%%d = alloca [%u x %s], align %d\n", regres, nelems, llvm_type, llvm_size);
+		}
+	}
+	else if(inglobalscope){ //simple variable in global scope
+		if(has_val && ast_has_literal(ininode)){ //we only initialize it if the initializer is a literal
+			Literal* l = ast_get_literal(ininode);;
+			switch(node_type){
+				case TYPE_INT:
+					llvm_iprint("@g%d = global %s %d, align %d\n", regres, llvm_type, l->value.i, llvm_size);
+					break;
+				case TYPE_FLT:
+					llvm_iprint("@g%d = global %s %f, align %d\n", regres, llvm_type, l->value.f, llvm_size);
+					break;
+				case TYPE_CHAR:
+					llvm_iprint("@g%d = global %s %c, align %d\n", regres, llvm_type, l->value.c, llvm_size);
+					break;
+				default:
+					llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", regres, llvm_type, llvm_size);
+					break;
+			}
+		}
+		else{
+			llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", regres, llvm_type, llvm_size);
+		}
+	}
+	else{ //simple variable in local scope
+		llvm_iprint("%%%d = alloca %s, align %d\n", regres, llvm_type, llvm_size);
+		if(has_val){
+			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvm_type, reginit, regres, llvm_size);
+		}
 	}
 
 	llvm_print("\n");
 
-	return reg2;
+	return regres;
 }
 
 int llvm_genIR_varuse(AST* node){
-	enum Type vtype = ast_get_type(node);
-	const char* llvmtype = llvm_get_type(vtype);
-	int llvmsize = llvm_get_size(vtype);
-	int reg1 = LLVM_NEW_INT_REG();
+	enum Type node_type = ast_get_type(node);
+	const char* llvm_type = llvm_get_type(node_type);
+	int llvm_size = llvm_get_size(node_type);
+	int isarray = ast_get_children_count(node) > 0;
+	int regres = -1;
 
-	llvm_comment2("Reading %s variable from memory", llvmtype);
-	switch(vtype){
-		case TYPE_FLT:
-		case TYPE_INT:
-		case TYPE_CHAR:
-			if(var_in_global_scope(node)){
-				llvm_iprint("%%%d = load %s, ptr @g%d, align %d\n", reg1, llvmtype, framemanager_read(node), llvmsize);
-			}
-			else{
-				llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", reg1, llvmtype, framemanager_read(node), llvmsize);
-			}
-			break;
-		default:
-			assert(0);
-			break;
+	if(node_type != TYPE_FLT && node_type != TYPE_INT && node_type != TYPE_CHAR){
+		assert(0);
+	}
+
+	if(isarray){
+		//%v = getelementptr inbounds <llvm_type>, ptr %a, i64 <idx>
+		int idxreg = llvm_genIR_recursive(ast_get_child(node, 0));
+		// int tmpreg = LLVM_NEW_INT_REG();
+		int elemreg = LLVM_NEW_INT_REG();
+		regres = LLVM_NEW_INT_REG();
+
+		llvm_comment2("Reading %s variable (array=%d) from memory", llvm_type, isarray);
+		if(var_in_global_scope(node)){
+			// llvm_iprint("%%%d = load i32, ptr %%%d, align %d\n", tmpreg, idxreg, llvm_size);
+			llvm_iprint("%%%d = getelementptr inbounds %s, ptr @g%d, i32 %%%d\n", elemreg, llvm_type, framemanager_read(node), idxreg);
+		}
+		else{
+			// llvm_iprint("%%%d = load i32, ptr %%%d, align %d\n", tmpreg, idxreg, llvm_size);
+			// llvm_iprint("%%%d = getelementptr inbounds [%u x %s], [%u x %s]* %%%d, i32 0, i32 %%%d\n", elemreg, asize, llvm_type, asize, llvm_type, framemanager_read(node), idxreg);
+			llvm_iprint("%%%d = getelementptr inbounds %s, ptr %%%d, i32 %%%d\n", elemreg, llvm_type, framemanager_read(node), idxreg);
+		}
+		llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", regres, llvm_type, elemreg, llvm_size);
+	}
+	else{
+
+		llvm_comment2("Reading %s variable (array=%d) from memory", llvm_type, isarray);
+		regres = LLVM_NEW_INT_REG();
+		if(var_in_global_scope(node)){
+			llvm_iprint("%%%d = load %s, ptr @g%d, align %d\n", regres, llvm_type, framemanager_read(node), llvm_size);
+		}
+		else{
+			llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", regres, llvm_type, framemanager_read(node), llvm_size);
+		}
 	}
 	llvm_print("\n");
 
-	return reg1;
+	return regres;
 }
 
 int llvm_genIR_assign(AST* node){
 	AST* lhs = ast_get_child(node, 0);
 	AST* rhs = ast_get_child(node, 1);
-	enum Type vtype = ast_get_type(lhs);
+	enum Type node_type = ast_get_type(lhs);
 	Variable* var = ast_get_variable(lhs);
-	const char* llvmtype = llvm_get_type(vtype);
-	int llvmsize = llvm_get_size(vtype);
+	const char* llvm_type = llvm_get_type(node_type);
+	int llvm_size = llvm_get_size(node_type);
+	int isarray = ast_get_children_count(lhs) > 0;
+	int rhsreg = -1;
+	int lhsreg = -1;
+	if(node_type != TYPE_FLT && node_type != TYPE_INT && node_type != TYPE_CHAR){
+		assert(0);
+	}
 
-	int reg1 = llvm_genIR_recursive(rhs);
-	int reg2 = framemanager_read(lhs);
+	if(isarray){
+		rhsreg = llvm_genIR_recursive(rhs);
+		AST* idx = ast_get_child(lhs, 0);
+		int idxreg = llvm_genIR_recursive(idx);
+		// int tmpreg = LLVM_NEW_INT_REG();
+		lhsreg = framemanager_read(lhs);
+		int elemreg = LLVM_NEW_INT_REG();
 
-	llvm_comment2("Writing to %s variable (%s) in memory", llvmtype, var->name);
-	switch(vtype){
-		case TYPE_FLT:
-		case TYPE_INT:
-		case TYPE_CHAR:
-			if(var_in_global_scope(lhs)){
-				llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
-			}
-			else{
-				llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
-			}
-			break;
-		default:
-			assert(0);
-			break;
+		llvm_comment2("Writing to %s variable (%s, array=%d) in memory", llvm_type, var->name, isarray);
+		if(var_in_global_scope(lhs)){
+			llvm_iprint("%%%d = getelementptr inbounds %s, ptr @g%d, i32 %%%d\n", elemreg, llvm_type, lhsreg, idxreg);
+			llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvm_type, rhsreg, elemreg, llvm_size);
+		}
+		else{
+			llvm_iprint("%%%d = getelementptr inbounds %s, ptr %%%d, i32 %%%d\n", elemreg, llvm_type, lhsreg, idxreg);
+			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvm_type, rhsreg, elemreg, llvm_size);
+		}
+	}
+	else{
+		rhsreg = llvm_genIR_recursive(rhs);
+		lhsreg = framemanager_read(lhs);
+
+		llvm_comment2("Writing to %s variable (%s, array=%d) in memory", llvm_type, var->name, isarray);
+		if(var_in_global_scope(lhs)){
+			llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvm_type, rhsreg, lhsreg, llvm_size);
+		}
+		else{
+			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvm_type, rhsreg, lhsreg, llvm_size);
+		}
 	}
 
 	llvm_print("\n");
-	return reg2;
+	return lhsreg;
 }
 
 int llvm_IR_binlop(AST* ast, const char* opcode, const char* cond){
@@ -846,6 +907,7 @@ void llvm_genIR_function_definition(AST* fnode){
 			llvm_iprint("%%%d = alloca %s, align %d\n", glueregs[i], llvm_get_type(argtype), llvm_get_size(argtype));
 			llvm_iprint("store %s %%arg%lu, ptr %%%d, align %d\n", llvm_get_type(argtype), i, glueregs[i], llvm_get_size(argtype));
 		}
+		llvm_print("\n");
 
 		framemanager_push(fblock);
 		// llvm_comment2("+++ Fake block %d entered\n", framemanager_current_block());
@@ -1135,6 +1197,15 @@ int llvm_get_size(enum Type type){
 
 
 
+
+/* ARRAY */
+// int llvm_genIR_arrayval(){
+
+// 	return -1;
+// }
+
+
+
 /* MEMORY */
 
 void framemanager_init(void){
@@ -1177,6 +1248,16 @@ int framemanager_read(AST* var){
 	return frame->addrs[v->reladdr];
 }
 
+// int framemanager_readarray(AST* var, int idx){
+// 	Scope* scope = ast_get_scope(var);
+// 	int scopeid = scope_get_id(scope);
+// 	Stack* blockframe = llvm_memory.blockframes[scopeid];
+// 	BlockFrame* frame = stack_top(blockframe);
+// 	Variable* v = ast_get_variable(var);
+// 	// printf("var %s (scope=%d) should be at %d... using reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
+// 	return frame->addrs[v->reladdr + idx];
+// }
+
 void framemanager_write(AST* var, int reg){
 	Scope* scope = ast_get_scope(var);
 	int scopeid = scope_get_id(scope);
@@ -1187,6 +1268,16 @@ void framemanager_write(AST* var, int reg){
 	frame->addrs[v->reladdr] = reg;
 	// printf("var %s (scope=%d) should be at %d... writing reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
 }
+
+// void framemanager_writearray(AST* var, int idx, int reg){
+// 	Scope* scope = ast_get_scope(var);
+// 	int scopeid = scope_get_id(scope);
+// 	Stack* blockframe = llvm_memory.blockframes[scopeid];
+// 	BlockFrame* frame = stack_top(blockframe);
+
+// 	Variable* v = ast_get_variable(var);
+// 	frame->addrs[v->reladdr + idx] = reg;
+// }
 
 void framemanager_push(AST* block){
 	Scope* scope = ast_get_scope(block);

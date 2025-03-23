@@ -98,6 +98,7 @@ AST* ast_manager_add_funcret(AST* expr);
 AST* ast_manager_fcall(char* funcname);
 AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblock, int function_definition);
 AST* ast_manager_binop(AST* op1, AST* op2, NodeKind nodekind, TypeData (*operation)(enum Type, enum Type));
+AST* ast_manager_array_access(char* name, AST* idx);
 int ast_manager_missing_retstmt(AST* fblock);
 
 %}
@@ -450,7 +451,7 @@ expr:
 | PLUS FLOATVAL             { $$ = ast_manager_from_literal(&$2); }
 | fcall                     { $$ = $1; }
 | AMP ID                    { check_var_declaration($2); $$ = NULL; }
-| ID LBRACKET expr RBRACKET { check_var_declaration($1); $$ = NULL; } //TODO: improve this
+| ID LBRACKET expr RBRACKET { check_var_declaration($1); $$ = ast_manager_array_access($1, $3); }
 ;
 
 fcaller:
@@ -917,10 +918,11 @@ AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
 	check_assignment(name, val); 
 
 	AST* stmt = ast_new_node(NODE_ASSIGN);
-	AST* var = ast_manager_from_id(name);
+	AST* var = ast_manager_array_access(name, idx);
+	// AST* var = ast_manager_from_id(name);
 	NodeData data;
 	data.lit.type = ast_get_type(var);
-	ast_add_child(var, idx);
+	// ast_add_child(var, idx);
 	ast_add_child(stmt, var);
 	ast_add_child(stmt, val);
 	ast_set_data(stmt, data);
@@ -971,10 +973,16 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 				ast_add_child(fblock, ast_manager_add_funcret(NULL));
 			}
 			else{
-				//i mean, if a function with a return type is
-				//missing the last return, are we supposed to
-				//add a return? we definitely can, i just
-				//don't know if we should
+				//if a function with a return type is
+				//missing the last return stmt, are we supposed to
+				//add a return? i maen, we definitely can, i just
+				//don't know if we should (my mind is telling me no.......
+				//..........
+				//..........
+				//..........
+				//BUT MY BODY
+				//MY BODYYYYYYYYYYYYYYYY
+				//IS TELLING ME YEEEEEAAA)
 				Literal l;
 				memset(&l, 0, sizeof(Literal));
 				l.type = type;
@@ -1022,4 +1030,10 @@ AST* ast_manager_binop(
 	ndata.lit.type = data.type;
 	ast_set_data(res, ndata);
 	return res;
+}
+
+AST* ast_manager_array_access(char* varname, AST* idx){
+	AST* node = ast_manager_from_id(varname);
+	ast_add_child(node, idx);
+	return node;
 }

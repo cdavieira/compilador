@@ -27,8 +27,8 @@
 /* 23/03 */
 * [*] recursão de funções implementada e testada
 * [*] consertar inicialização de variaveis globais
-* [ ] implementar scanf
 * [ ] arrays
+* [ ] implementar scanf
 
 
 AVISOS
@@ -44,6 +44,9 @@ memória. Isso teve implicações visíveis ao implementar os nós da AST de
 conversão e de IF/WHILE. Nesse sentido, o backend feito REQUER que qualquer
 valor a ser usado seja carregado em um pointer criado pela operação 'alloca'.
 Isso aumenta o número de temporários, mas traz simplificações para o código.
+> errata: não sei se essa foi uma escolha boa pra ser sincero :'), mas de fato
+> trouxe alguns beneficios enquanto eu escrevia as partes do backend que fiz
+> referência no texto acima. O código talvez ficou mais complicado do que deveria!
 
 OBS2:
 não é necessário converter explicitamente um valor i32 para i1 antes de
