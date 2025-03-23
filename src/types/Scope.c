@@ -33,19 +33,19 @@ void scope_print(Scope* scope){
 
 }
 
-int scope_get_id(Scope* scope){
+int scope_get_id(const Scope* scope){
 	return scope->id;
 }
 
-int scope_get_parent(Scope* scope){
+int scope_get_parent(const Scope* scope){
 	return scope->parent;
 }
 
-int scope_get_level(Scope* scope){
+int scope_get_level(const Scope* scope){
 	return scope->level;
 }
 
-VarTable* scope_get_vartable(Scope* scope){
+VarTable* scope_get_vartable(const Scope* scope){
 	return scope->vartable;
 }
 
@@ -59,7 +59,7 @@ int scope_add(
     int line,
     enum Type type,
     enum Qualifier qualifier,
-    unsigned addr)
+    unsigned uid)
 {
 	if(scope_search_by_name(scope, name) != NULL){
 		return -1;
@@ -67,7 +67,7 @@ int scope_add(
 
 	//printf("Adding new variable '%s' to scope %d\n", name, scope->id);
 
-	return vartable_add(scope->vartable, name, line, type, qualifier, addr);
+	return vartable_add(scope->vartable, name, line, type, qualifier, uid);
 }
 
 Variable* scope_search_by_name(Scope* scope, const char* name){

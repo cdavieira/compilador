@@ -13,7 +13,8 @@ typedef struct Variable {
 	int line;
 	enum Qualifier qualifier;
 	enum Type type;
-	unsigned addr;
+	unsigned uid; //unique identifier
+	unsigned reladdr; //relative address
 } Variable;
 
 int variable_name_equals(Variable* var, const char* name);

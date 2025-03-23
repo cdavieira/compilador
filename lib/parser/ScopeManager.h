@@ -13,3 +13,6 @@ void scope_manager_exit(ScopeManager* manager);
 Scope* scope_manager_get_current_scope(ScopeManager* manager);
 Scope* scope_manager_search_by_name(ScopeManager* manager, const char* name);
 Scope* scope_manager_search(ScopeManager* manager, Variable* var);
+
+unsigned scope_manager_get_size(ScopeManager* manager);
+const Scope* scope_manager_get_scope(ScopeManager* manager, int idx);

@@ -65,6 +65,13 @@ void stack_push(Stack* const st, void* item){
 	st->elements[st->size++] = item;
 }
 
+void* stack_top(Stack* const st){
+	if(stack_is_empty(st)){
+		return NULL;
+	}
+	return st->elements[st->size-1];
+}
+
 void* stack_pop(Stack* const st){
 	if(stack_is_empty(st)){
 		return NULL;

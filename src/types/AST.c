@@ -156,6 +156,9 @@ void ast_set_data(AST* node, NodeData data){
 			node->has_data = 0;
 			break;
 		case NODE_BLOCK:
+			node->data.block = data.block;
+			node->has_data = 1;
+			break;
 		case NODE_IF:
 		case NODE_PROGRAM:
 		case NODE_VAR_LIST:
@@ -312,6 +315,53 @@ int ast_has_var(AST* node) {
 	return 0;
 }
 
+int ast_has_scope(AST* node){
+	switch(node->kind) {
+		case NODE_VAR_DECL:
+		case NODE_VAR_USE:
+		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
+		case NODE_BLOCK:
+		    return 1;
+		case NODE_PROGRAM:
+		case NODE_IF:
+		case NODE_VAR_LIST:
+		case NODE_INT_VAL:
+		case NODE_FLT_VAL:
+		case NODE_CHR_VAL:
+		case NODE_STR_VAL:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_TIMES:
+		case NODE_LT:
+		case NODE_GT:
+		case NODE_EQ:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
+		case NODE_ASSIGN:
+		case NODE_WHILE:
+		case NODE_SCANF:
+		case NODE_PRINTF:
+		case NODE_FUNC:
+		case NODE_I2F:
+		case NODE_I2C:
+		case NODE_C2I:
+		case NODE_C2F:
+		case NODE_F2I:
+		case NODE_F2C:
+		case NODE_NOCONV:
+		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
+		case NODE_FCALL:
+		case NODE_FUNC_RET:
+		case NODE_MOD:
+			break;
+	}
+	return 0;
+}
+
 Literal* ast_get_literal(AST* node){
 	switch(node->kind){
 		case NODE_ASSIGN:
@@ -387,6 +437,54 @@ Variable* ast_get_variable(AST* node){
 		case NODE_MOD:
 		case NODE_PROGRAM:
 		case NODE_BLOCK:
+		case NODE_IF:
+		case NODE_VAR_LIST:
+		case NODE_WHILE:
+		case NODE_I2F:
+		case NODE_I2C:
+		case NODE_C2I:
+		case NODE_C2F:
+		case NODE_F2I:
+		case NODE_F2C:
+		case NODE_NOCONV:
+		case NODE_FUNC_PARAMLIST:
+		case NODE_FUNC_BODY:
+		case NODE_FCALL:
+		case NODE_FUNC_RET:
+			break;
+	}
+	return NULL;
+}
+
+Scope* ast_get_scope(AST* node){
+	switch(node->kind){
+		case NODE_VAR_USE:
+		case NODE_VAR_DECL:
+		case NODE_ARRAY_VAL:
+		case NODE_PTR_VAL:
+			return node->data.var.scope;
+		case NODE_BLOCK:
+			return node->data.block.scope;
+		case NODE_ASSIGN:
+		case NODE_CHR_VAL:
+		case NODE_EQ:
+		case NODE_FLT_VAL:
+		case NODE_INT_VAL:
+		case NODE_LT:
+		case NODE_MINUS:
+		case NODE_OVER:
+		case NODE_PLUS:
+		case NODE_SCANF:
+		case NODE_FUNC:
+		case NODE_STR_VAL:
+		case NODE_TIMES:
+		case NODE_PRINTF:
+		case NODE_GT:
+		case NODE_NE:
+		case NODE_OR:
+		case NODE_AND:
+		case NODE_MOD:
+		case NODE_PROGRAM:
 		case NODE_IF:
 		case NODE_VAR_LIST:
 		case NODE_WHILE:

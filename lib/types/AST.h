@@ -70,6 +70,9 @@ typedef union NodeData {
 	struct {
 		Function* func;
 	} func;
+	struct {
+		Scope* scope;
+	} block;
 	Literal lit;
 	char* str;
 	void* nil;
@@ -93,8 +96,10 @@ void ast_add_child(AST *parent, AST *child);
 
 int ast_has_literal(AST* node);
 int ast_has_var(AST* node);
+int ast_has_scope(AST* node);
 Literal* ast_get_literal(AST* node);
 Variable* ast_get_variable(AST* node);
+Scope* ast_get_scope(AST* node);
 
 char* ast_kind2str(NodeKind kind);
 void ast_export_dot(AST *ast, FILE* fpout);

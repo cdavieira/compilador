@@ -12,10 +12,11 @@ int vartable_add(
 	int line,
 	enum Type type,
 	enum Qualifier qualifier,
-	unsigned addr);
+	unsigned uid);
 Variable* vartable_search(VarTable* vt, const char* name);
 Variable* vartable_sofisticated_search(VarTable* vt, Variable* var);
-Variable* vartable_idx(VarTable* vt, size_t idx);
+Variable* vartable_idx(const VarTable* vt, size_t idx);
 void vartable_print(VarTable* vt);
 void vartable_destroy(VarTable* vt);
+unsigned vartable_get_size(VarTable* vt);
 

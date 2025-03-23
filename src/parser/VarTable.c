@@ -20,7 +20,7 @@ int vartable_add(
 	int line,
 	enum Type type,
 	enum Qualifier qualifier,
-	unsigned addr)
+	unsigned uid)
 {
 	Variable* var = malloc(sizeof(Variable));
 	if(var == NULL){
@@ -30,8 +30,9 @@ int vartable_add(
 	var->line = line;
 	var->qualifier = qualifier;
 	var->type = type;
-	var->addr = addr;
-	return vector_append(vt->t, var);
+	var->uid = uid;
+	var->reladdr = vector_append(vt->t, var);
+	return var->reladdr;
 }
 
 Variable* vartable_search(VarTable* vt, const char* s) {
@@ -42,7 +43,7 @@ Variable* vartable_search(VarTable* vt, const char* s) {
 // 	return vector_search(vt->t, (void*) var, (int (*)(void*, void*)) variable_cmp);
 // }
 
-Variable* vartable_idx(VarTable* vt, size_t idx){
+Variable* vartable_idx(const VarTable* vt, size_t idx){
 	return vector_get_item(vt->t, idx);
 }
 
@@ -63,4 +64,8 @@ void vartable_print(VarTable* vt){
 void vartable_destroy(VarTable* vt) {
 	vector_destroy(&vt->t, free);
 	free(vt);
+}
+
+unsigned vartable_get_size(VarTable* vt){
+	return vector_get_size(vt->t);
 }

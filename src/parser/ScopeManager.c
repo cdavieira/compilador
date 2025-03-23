@@ -146,6 +146,14 @@ Scope* scope_manager_search_by_name(ScopeManager* manager, const char* varname){
 //	return scope_manager_search_recursive(manager, parent, search);
 //}
 
+unsigned scope_manager_get_size(ScopeManager* manager){
+	return vector_get_size(manager->scopes);
+}
+
+const Scope* scope_manager_get_scope(ScopeManager* manager, int idx){
+	return vector_get_item(manager->scopes, idx);
+}
+
 static int scope_manager_search_by_name_recursive(
 	ScopeManager* manager, Scope* scope, const char* name)
 {

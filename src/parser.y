@@ -48,6 +48,7 @@ int* ast_block;
 Stack* ast_block_history;
 
 //count of how many variables and funcparams have been created so far in this program.
+//this is the number which generates unique IDs (uid) for all variables.
 unsigned var_count;
 
 /* bison internals */
@@ -276,7 +277,7 @@ program:
 
 declarations:
   declaration              { $$ = ast_manager_add_declaration($$, $1, 1); }
-| declaration declarations { $$ = ast_manager_add_declaration($2, $1, 0); }
+| declarations declaration { $$ = ast_manager_add_declaration($1, $2, 0); }
 ;
 
 
@@ -747,6 +748,9 @@ AST* ast_manager_add_param_decl(AST* paramlist, AST* param, int create_paramlist
 AST* ast_manager_add_to_block(AST* block, AST* item){
 	if(*ast_block == 0){
 		block = ast_new_node(NODE_BLOCK);
+		NodeData data;
+		data.block.scope = scope_manager_get_current_scope(scope_manager);
+		ast_set_data(block, data); 
 		*ast_block = 1;
 	}
 	if(item){
@@ -976,7 +980,6 @@ AST* ast_manager_add_function(char *name, enum Type type, AST* params, AST* fblo
 }
 
 int ast_manager_missing_retstmt(AST* fblock){
-	AST* child;
 	unsigned childCount = ast_get_children_count(fblock);
 	if(childCount == 0){
 		return 1;

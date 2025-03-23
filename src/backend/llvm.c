@@ -44,12 +44,16 @@
 
 #include "backend/llvm.h"
 // #include "parser/VarTable.h"
+#include "parser/VarTable.h"
 #include "types/AST.h"
 #include "types/Function.h"
 // #include "types/Scope.h"
+#include "types/Scope.h"
 #include "types/Type.h"
 #include "parser/FuncTable.h"
+#include "parser/ScopeManager.h"
 #include "utils/Vector.h"
+#include "utils/Stack.h"
 
 
 
@@ -65,7 +69,76 @@
 #define llvm_comment1(fmt) llvm_iprint("; "fmt"\n")
 #define llvm_comment2(fmt, ...) llvm_iprint("; "fmt"\n", __VA_ARGS__)
 
+//Frame Context
+typedef struct BlockFrame {
+      int* addrs;
+      int size;
+} BlockFrame;
 
+/* DONT STOP READING
+ *
+ * How should this FrameManager struct work:
+ * 1. Each element is a funcframe;
+ * 2. Each funcframe is associated with one function.
+ * 3. A funcframe is a stack of frames.
+ * 4. A frame corresponds to a scratch-space memory that gets created every time a function gets called
+ * 5. KEEP READING
+ *
+ * OBS1: From 1) and 2) we can imply that the FrameManager instance would then
+ * store a number of elements equal to the number of USER-DEFINED functions in
+ * the program
+ *
+ * OK, BUT THAT'S JUST NOT HOW THE FOLLOWING FRAMEMANAGER STRUCT WAS IMPLEMENTED...
+ * WHY?
+ *
+ * Well, it would definitely possible to do that, but it's convenient to take
+ * a different approach (which happens to be more flexible) because of how the
+ * 'ScopeManager' struct works.
+ *
+ * For this parser, the ScopeManager takes care of the creation of all scopes
+ * found in the C file during the parse phase
+ *
+ * The ScopeManager creates one scope for each block found in the code,
+ * instead of for each function. Therefore, it has a list of block scopes
+ * rather than function scopes, although it keeps track of how each scope
+ * relates to each other. By that, i mean that it is possible to find all
+ * scopes that belong to an arbitrary function, when using an underlying
+ * datastructure appropriate for that purpose (UNION-FIND).
+ *
+ * Since i would have to implement the union-find scheme and additional code for
+ * that, i decided to take a different approach for the FrameManager, which
+ * works with blockframes instead of funcframes.
+ *
+ * I've thought about it for a while and it really works. The only difference
+ * is that instead of saving the context (memory and other stuff) when a
+ * function gets activated/called, we do the same thing but for each block.
+ *
+ * Since each block is unique and always begin and end (there's nothing like
+ * entering in a block and never quitting (with the exception being for
+ * infinite loops and infinite stuff)), this approach is possible.
+ *
+ * So, for this implementation of FrameManager, the following points are
+ * valid instead:
+ * 1. Each element is a blockframe;
+ * 2. Each blockframe is associated with one block.
+ * 3. A blockframe is a stack of blocks.
+ * 4. A blockframe corresponds to a scratch-space memory that gets created every time a block gets activated
+ *
+ * OBS1: From 1) and 2) we can imply that the FrameManager instance stores a
+ * number of elements equal to the number of blocks in the program
+ *
+ * OBS2: 'blockframes' is a Vector of Stacks
+ *
+ * OBS3: each blockframe is a Stack, where the top element is the current blockframe underexecution.
+ *
+ * OBS4: if a blockframe is empty, that means that that block is deactivated,
+ * that is, it hasn't been called yet.
+ * */
+typedef struct FrameManager {
+      Stack** blockframes;
+      int nblocks;
+      int currentblock;
+} FrameManager ;
 
 enum arghint {
       ARG_NOHINT = 1,
@@ -78,17 +151,32 @@ FILE* fdump;
 int registerID = 1; //this should be unsigned actually
 unsigned ifID = 1;
 unsigned whileID = 1;
+unsigned paramID = 1;
 int indentLevel;
-int *llvm_memory;
 extern int var_count; // parser.y
 extern Vector* stringliterals; // lexer.l
 extern FuncTable* functable; // parser.y
+extern ScopeManager* scope_manager; // parser.y
+FrameManager llvm_memory;
 
 
+
+/* MEMORY OF REGISTERS */
+void framemanager_init(void);
+void framemanager_destroy(void);
+int framemanager_read(AST* var);
+void framemanager_write(AST* var, int reg);
+void framemanager_push(AST* block);
+void framemanager_pop(AST* block);
+int framemanager_current_block(void);
+int in_global_scope();
+int var_in_global_scope(AST* var);
+BlockFrame* frame_new(unsigned sz);
+void frame_destroy(void* frame);
 
 /* core */
 int llvm_genIR_recursive(AST* root);
-void llvm_genIR_ftable(void);
+void llvm_genIR_extfuncs(void);
 void llvm_genIR_strtable(void);
 
 /* expr */
@@ -128,7 +216,7 @@ int llvm_genIR_printf(AST* ast);
 int llvm_genIR_scanf(AST* ast);
 int llvm_genIR_fcall(AST* ast);
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint);
-void llvm_genIR_paramlist(AST* ast, size_t childCount, int argregs[childCount], enum arghint hint);
+void llvm_genIR_block(AST* block);
 
 /* helpers */
 void indent();
@@ -149,12 +237,12 @@ int llvm_get_size(enum Type type);
 void llvm_genIR(AST* root, FILE* fdout){
 	fdump = fdout;
 	indentLevel = 0;
-	llvm_memory = calloc(var_count, sizeof(int));
+	framemanager_init();
 	llvm_genIR_strtable();
-	llvm_genIR_ftable();
+	llvm_genIR_extfuncs();
 	llvm_genIR_recursive(root);
 	indentLevel = 0;
-	free(llvm_memory);
+	framemanager_destroy();
 	fdump = NULL;
 }
 
@@ -218,12 +306,16 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_FUNC_RET:
 			return llvm_genIR_function_return(root);
 		case NODE_FCALL:
-			llvm_comment1("TODO: fcall\n");
-			break;
+			// llvm_comment1("TODO: fcall\n");
+			// break;
+			return llvm_genIR_fcall(root);
 		case NODE_SCANF:
 			return llvm_genIR_scanf(root);
 		case NODE_PRINTF:
 			return llvm_genIR_printf(root);
+		case NODE_BLOCK: //its a long story
+			llvm_genIR_block(root);
+			return -1;
 
 
 		// Arrays (compound variables)
@@ -251,10 +343,9 @@ int llvm_genIR_recursive(AST* root){
 
 
 		// Node kinds which don't need to be handled (only their children)
-		case NODE_PROGRAM: //has 0 or 1 child
 		case NODE_FUNC_BODY: //has 0 or 1 children
+		case NODE_PROGRAM: //has 0 or 1 child
 		case NODE_VAR_LIST: //has 1 or more children
-		case NODE_BLOCK: //has 1 or more children
 			// printf("Node %s: starting to transverse children...\n", ast_kind2str(kind));
 			for(unsigned i=0; i<childCount; i++){
 				llvm_genIR_recursive(ast_get_child(root, i));
@@ -266,41 +357,10 @@ int llvm_genIR_recursive(AST* root){
 	return -1;
 }
 
-void llvm_genIR_ftable(void){
-	llvm_print("; Dumping ftable\n");
-
+void llvm_genIR_extfuncs(void){
+	llvm_print("; Dumping external funcs\n");
 	llvm_print("declare i32 @printf(i8*, ...)\n");
 	llvm_print("declare i32 @scanf(i8*, ...)\n");
-
-	// unsigned count = func_table_get_size(functable);
-	// Function* f;
-	// Scope* scope;
-	// VarTable* vt;
-	// Variable* var;
-	// const char* fname;
-	// const char* llvmtypename;
-	// int nparams;
-	// for(unsigned i=2; i<count; i++){
-	// 	f = func_table_get(functable, i);
-
-	// 	nparams = func_get_nparams(f);
-
-	// 	fname = func_get_name(f);
-	// 	llvmtypename = llvm_get_type(func_get_return(f));
-	// 	scope = func_get_scope(f);
-	// 	vt = scope_get_vartable(scope);
-
-	// 	llvm_print("declare %s @%s(", llvmtypename, fname);
-	// 	if(nparams != 0){
-	// 		var = vartable_idx(vt, 0);
-	// 		llvm_print("%s", llvm_get_type(var->type));
-	// 		for(int j=1; j<nparams; j++){
-	// 			llvm_print(", %s", llvm_get_type(var->type));
-	// 		}
-	// 	}
-	// 	llvm_print(")\n");
-	// }
-
 	llvm_print("\n");
 }
 
@@ -422,7 +482,6 @@ int llvm_genIR_conv(const char* opcode, int fromreg, enum Type from, enum Type t
 }
 
 int llvm_genIR_vardecl(AST* node){
-	Variable* v = ast_get_variable(node);
 	unsigned count = ast_get_children_count(node);
 	enum Type vtype = ast_get_type(node);
 
@@ -439,10 +498,19 @@ int llvm_genIR_vardecl(AST* node){
 		case TYPE_FLT:
 		case TYPE_INT:
 		case TYPE_CHAR:
-			llvm_iprint("%%%d = alloca %s, align %d\n", reg2, llvmtype, llvmsize);
-			llvm_memory[v->addr] = reg2;
-			if(has_val){
-				llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+			framemanager_write(node, reg2);
+			if(in_global_scope()){
+				llvm_iprint("@g%d = global %s zeroinitializer, align %d\n", reg2, llvmtype, llvmsize);
+				if(has_val){
+					//NOTE: THIS MIGHT BE WRONG
+					llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+				}
+			}
+			else{
+				llvm_iprint("%%%d = alloca %s, align %d\n", reg2, llvmtype, llvmsize);
+				if(has_val){
+					llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+				}
 			}
 			break;
 		default:
@@ -456,7 +524,6 @@ int llvm_genIR_vardecl(AST* node){
 }
 
 int llvm_genIR_varuse(AST* node){
-	Variable* v = ast_get_variable(node);
 	enum Type vtype = ast_get_type(node);
 	const char* llvmtype = llvm_get_type(vtype);
 	int llvmsize = llvm_get_size(vtype);
@@ -467,7 +534,12 @@ int llvm_genIR_varuse(AST* node){
 		case TYPE_FLT:
 		case TYPE_INT:
 		case TYPE_CHAR:
-			llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", reg1, llvmtype, llvm_memory[v->addr], llvmsize);
+			if(var_in_global_scope(node)){
+				llvm_iprint("%%%d = load %s, ptr @g%d, align %d\n", reg1, llvmtype, framemanager_read(node), llvmsize);
+			}
+			else{
+				llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", reg1, llvmtype, framemanager_read(node), llvmsize);
+			}
 			break;
 		default:
 			assert(0);
@@ -486,15 +558,20 @@ int llvm_genIR_assign(AST* node){
 	const char* llvmtype = llvm_get_type(vtype);
 	int llvmsize = llvm_get_size(vtype);
 
-	llvm_comment2("Writing to %s variable (%s) in memory", llvmtype, var->name);
-
 	int reg1 = llvm_genIR_recursive(rhs);
-	int reg2 = llvm_memory[var->addr];
+	int reg2 = framemanager_read(lhs);
+
+	llvm_comment2("Writing to %s variable (%s) in memory", llvmtype, var->name);
 	switch(vtype){
 		case TYPE_FLT:
 		case TYPE_INT:
 		case TYPE_CHAR:
-			llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+			if(var_in_global_scope(lhs)){
+				llvm_iprint("store %s %%%d, ptr @g%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+			}
+			else{
+				llvm_iprint("store %s %%%d, ptr %%%d, align %d\n", llvmtype, reg1, reg2, llvmsize);
+			}
 			break;
 		default:
 			assert(0);
@@ -674,6 +751,8 @@ void llvm_genIR_while(AST* ast){
 /* FUNCTIONS */
 
 void llvm_genIR_function_definition(AST* fnode){
+	registerID = 1;
+
 	Function* f = ast_get_data(fnode).func.func;
 	if(!func_is_defined(f)){
 		return ;
@@ -683,6 +762,7 @@ void llvm_genIR_function_definition(AST* fnode){
 	const char* fname = func_get_name(f);
 	const char* llvm_ftype = llvm_get_type(fret);
 
+
 	llvm_comment1("Writing function");
 
 	//func name
@@ -690,26 +770,77 @@ void llvm_genIR_function_definition(AST* fnode){
 
 	//func paramlist
 	AST* paramlist = ast_get_child(fnode, 0);
-	size_t childCount = ast_get_children_count(paramlist);
-	if(childCount == 0){
+	size_t nparams = ast_get_children_count(paramlist);
+	AST* child;
+
+	if(nparams == 0){
 		llvm_print("()");
 	}
 	else{
-		AST* child = ast_get_child(paramlist, 0);
-		llvm_print("(%s", llvm_get_type(ast_get_type(child)));
-		for(size_t i=1; i<childCount; i++){
+		child = ast_get_child(paramlist, 0);
+		llvm_print("(%s %%arg0", llvm_get_type(ast_get_type(child)));
+		for(size_t i=1; i<nparams; i++){
 			child = ast_get_child(paramlist, i);
-			llvm_print(", %s", llvm_get_type(ast_get_type(child)));
+			llvm_print(", %s %%arg%lu", llvm_get_type(ast_get_type(child)), i);
 		}
 		llvm_print(")");
 	}
 
 	//func body
-	llvm_print("{\n");
-	indentLevel++;
-	llvm_genIR_recursive(ast_get_child(fnode, 1));
-	indentLevel--;
-	llvm_print("}\n\n");
+	AST* fbody = ast_get_child(fnode, 1);
+	AST* fblock = ast_get_child(fbody, 0);
+	if(fblock == NULL){
+		//the function return type is void when it is defined but it
+		//doesn't have a block
+		llvm_print("{\n");
+		indentLevel++;
+		llvm_iprint("ret void\n");
+		indentLevel--;
+		llvm_print("}\n\n");
+	}
+	else if(nparams == 0){
+		llvm_print("{\n");
+		indentLevel++;
+		llvm_genIR_recursive(fbody);
+		indentLevel--;
+		llvm_print("}\n\n");
+	}
+	else{
+		llvm_print("{\n");
+		indentLevel++;
+
+		llvm_comment1("Generating arglist glue");
+		int glueregs[nparams];
+		enum Type argtype;
+		for(size_t i=0; i<nparams; i++){
+			//%par0, %par1, %par2, ...
+			glueregs[i] = LLVM_NEW_INT_REG();
+			child = ast_get_child(paramlist, i);
+			argtype = ast_get_type(child);
+			// framemanager_write(child, gluereg1);
+			llvm_iprint("%%%d = alloca %s, align %d\n", glueregs[i], llvm_get_type(argtype), llvm_get_size(argtype));
+			llvm_iprint("store %s %%arg%lu, ptr %%%d, align %d\n", llvm_get_type(argtype), i, glueregs[i], llvm_get_size(argtype));
+		}
+
+		framemanager_push(fblock);
+		// llvm_comment2("+++ Fake block %d entered\n", framemanager_current_block());
+
+		for(size_t i=0; i<nparams; i++){
+			child = ast_get_child(paramlist, i);
+			framemanager_write(child, glueregs[i]);
+		}
+
+		unsigned childCount = ast_get_children_count(fblock);
+		for(unsigned i=0; i<childCount; i++){
+			llvm_genIR_recursive(ast_get_child(fblock, i));
+		}
+
+		// llvm_comment2("--- Fake block %d exited\n", framemanager_current_block());
+		framemanager_pop(fblock);
+
+		indentLevel--;
+		llvm_print("}\n\n");
+	}
 }
 
 int llvm_genIR_function_return(AST* ret){
@@ -747,7 +878,19 @@ int llvm_genIR_printlike_dummy(AST* ast, const char* fname){
 
 	int reg1 = LLVM_NEW_INT_REG();
 	llvm_iprint("%%%d = call i32 (i8*, ...) @%s", reg1, fname);
-	llvm_genIR_paramlist(ast, childCount, argregs, ARG_FLT2DOUBLE);
+
+	llvm_print("(");
+	enum Type ttype = ast_get_type(ast_get_child(ast, 0));
+	llvm_genIR_fcall_arg(ttype, argregs[0], ARG_FLT2DOUBLE);
+	if(childCount > 1){
+		for(size_t i=1; i<childCount; i++){
+			llvm_print(", ");
+			ttype = ast_get_type(ast_get_child(ast, i));
+			llvm_genIR_fcall_arg(ttype, argregs[i], ARG_FLT2DOUBLE);
+		}
+	}
+	llvm_print(")\n");
+
 	llvm_comment2("--- %s()\n", fname);
 	return reg1;
 }
@@ -761,35 +904,60 @@ int llvm_genIR_scanf(AST* ast){
 }
 
 int llvm_genIR_fcall(AST* ast){
-	int reg1 = LLVM_NEW_INT_REG();
+	size_t childCount = ast_get_children_count(ast);
 	NodeData data = ast_get_data(ast);
 	Function* f = data.func.func;
 	const char* fname = func_get_name(f);
+	enum Type fret = func_get_return(f);
+	const char* fretname = llvm_get_type(fret);
+	int regret = -1;
 
-	llvm_comment2("+++ %s()\n", fname);
-	llvm_comment2("--- %s()\n", fname);
-	llvm_print("\n");
+	llvm_comment2("+++ %s()", fname);
 
-	return reg1;
-}
+	if(childCount > 0){
+		AST* child;
+		int argregs[childCount];
+		enum Type argtype;
 
-void llvm_genIR_paramlist(AST* ast, size_t childCount, int argregs[childCount], enum arghint hint){
-	llvm_print("(");
-	enum Type ttype = ast_get_type(ast_get_child(ast, 0));
-	llvm_genIR_fcall_arg(ttype, argregs[0], hint);
-	if(childCount > 1){
-		for(size_t i=1; i<childCount; i++){
-			llvm_print(", ");
-			ttype = ast_get_type(ast_get_child(ast, i));
-			llvm_genIR_fcall_arg(ttype, argregs[i], hint);
+		/* expanding arguments */
+		for(size_t i=0; i<childCount; i++){
+			child = ast_get_child(ast, i);
+			argregs[i] = llvm_genIR_recursive(child);
 		}
+
+		/* writing llvm ir funccall */
+		if(fret != TYPE_VOID){
+			regret = LLVM_NEW_INT_REG();
+			llvm_iprint("%%%d = ", regret);
+		}
+
+		llvm_iprint("call %s @%s(", fretname, fname);
+
+		//writing paramlist
+		argtype = ast_get_type(ast_get_child(ast, 0));
+		llvm_genIR_fcall_arg(argtype, argregs[0], ARG_FLT2DOUBLE);
+		if(childCount > 1){
+			for(size_t i=1; i<childCount; i++){
+				llvm_print(", ");
+				argtype = ast_get_type(ast_get_child(ast, i));
+				llvm_genIR_fcall_arg(argtype, argregs[i], ARG_FLT2DOUBLE);
+			}
+		}
+		llvm_print(")\n");
 	}
-	llvm_print(")\n");
+	else{
+		if(fret != TYPE_VOID){
+			regret = LLVM_NEW_INT_REG();
+			llvm_iprint("%%%d = ", regret);
+		}
+		llvm_iprint("call %s @%s()\n", fretname, fname);
+	}
+
+	llvm_comment2("--- %s()", fname);
+	return regret;
 }
 
 void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
-	//  i8* getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0)
-	//  <result> = getelementptr <ty>, <N x ptr> <ptrval>, <vector index type> <idx>
 	const char* llvmtname = llvm_get_type(ttype);
 	size_t chcount;
 	switch(ttype){
@@ -816,6 +984,19 @@ void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
 		default:
 			break;
 	}
+}
+
+void llvm_genIR_block(AST* block){
+	framemanager_push(block);
+	llvm_comment2("+++ Block %d entered\n", framemanager_current_block());
+
+	unsigned childCount = ast_get_children_count(block);
+	for(unsigned i=0; i<childCount; i++){
+		llvm_genIR_recursive(ast_get_child(block, i));
+	}
+
+	llvm_comment2("--- Block %d exited\n", framemanager_current_block());
+	framemanager_pop(block);
 }
 
 
@@ -911,4 +1092,106 @@ int llvm_get_size(enum Type type){
 			assert(0);
 	}
 	return -1;
+}
+
+
+
+
+/* MEMORY */
+
+void framemanager_init(void){
+	llvm_memory.nblocks = scope_manager_get_size(scope_manager);
+	llvm_memory.blockframes = calloc(llvm_memory.nblocks, sizeof(void*));
+	for(unsigned i=0; i<llvm_memory.nblocks; i++){
+	      llvm_memory.blockframes[i] = stack_new(8);
+	}
+
+	//initializing global blockframe
+	const Scope* globalscope = scope_manager_get_scope(scope_manager, 0);
+	VarTable* vt = scope_get_vartable(globalscope);
+	Stack* blockframe = llvm_memory.blockframes[0];
+	llvm_memory.currentblock = 0;
+	unsigned sz = vartable_get_size(vt);
+	//assert(sz != 0);
+	BlockFrame* frame = frame_new(sz);
+	stack_push(blockframe, frame);
+}
+
+void framemanager_destroy(void){
+	if(llvm_memory.blockframes){
+	      for(unsigned i=0; i<llvm_memory.nblocks; i++){
+		    stack_destroy(llvm_memory.blockframes + i, frame_destroy);
+	      }
+	      free(llvm_memory.blockframes);
+	}
+	llvm_memory.nblocks = 0;
+	llvm_memory.currentblock = -1;
+	llvm_memory.blockframes = NULL;
+}
+
+int framemanager_read(AST* var){
+	Scope* scope = ast_get_scope(var);
+	int scopeid = scope_get_id(scope);
+	Stack* blockframe = llvm_memory.blockframes[scopeid];
+	BlockFrame* frame = stack_top(blockframe);
+	Variable* v = ast_get_variable(var);
+	// printf("var %s (scope=%d) should be at %d\n", v->name, scopeid, v->reladdr);
+	return frame->addrs[v->reladdr];
+}
+
+void framemanager_write(AST* var, int reg){
+	Scope* scope = ast_get_scope(var);
+	int scopeid = scope_get_id(scope);
+	Stack* blockframe = llvm_memory.blockframes[scopeid];
+	BlockFrame* frame = stack_top(blockframe);
+
+	Variable* v = ast_get_variable(var);
+	frame->addrs[v->reladdr] = reg;
+}
+
+void framemanager_push(AST* block){
+	Scope* scope = ast_get_scope(block);
+	VarTable* vt = scope_get_vartable(scope);
+	int scopeid = scope_get_id(scope);
+	llvm_memory.currentblock = scopeid;
+	Stack* blockframe = llvm_memory.blockframes[scopeid];
+	BlockFrame* frame = frame_new(vartable_get_size(vt));
+	stack_push(blockframe, frame);
+}
+
+void framemanager_pop(AST* block){
+	Scope* scope = ast_get_scope(block);
+	int scopeid = scope_get_id(scope);
+	llvm_memory.currentblock = scope_get_parent(scope);
+	Stack* blockframe = llvm_memory.blockframes[scopeid];
+	BlockFrame* frame = stack_pop(blockframe);
+	frame_destroy(frame);
+}
+
+int framemanager_current_block(void){
+	// Stack* blockframe = llvm_memory.blockframes[llvm_memory.currentblock];
+	return llvm_memory.currentblock;
+}
+
+int in_global_scope(){
+	return llvm_memory.currentblock == 0;
+}
+
+int var_in_global_scope(AST* var){
+	Scope* scope = ast_get_scope(var);
+	assert(scope);
+	return scope_get_id(scope) == 0;
+}
+
+BlockFrame* frame_new(unsigned sz){
+	BlockFrame* frame = calloc(1, sizeof(BlockFrame));
+	frame->size = sz;
+	frame->addrs = calloc(sz, sizeof(int));
+	return frame;
+}
+
+void frame_destroy(void* frame){
+	BlockFrame* bframe = frame;
+	free(bframe->addrs);
+	free(bframe);
 }

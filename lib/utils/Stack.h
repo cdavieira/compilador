@@ -19,6 +19,7 @@ size_t stack_get_maxsize(Stack const * const st);
 
 
 void stack_push(Stack* const st, void* item);
+void* stack_top(Stack* const st);
 void* stack_pop(Stack* const st);
 
 
