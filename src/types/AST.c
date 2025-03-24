@@ -362,6 +362,24 @@ int ast_has_scope(AST* node){
 	return 0;
 }
 
+int ast_is_array(AST* node){
+	int case1 = (node->kind == NODE_VAR_USE) &&
+		    (node->data.var.var.qualifier > 0) &&
+	            (vector_get_size(node->children) == 0);
+	// int case2 = (node->kind == NODE_VAR_DECL) &&
+	//             (vector_get_size(node->children) > 0) &&
+	// 	    (((AST*)vector_get_item(node->children, 0))->kind == NODE_ARRAY_VAL);
+	int case2 = (node->kind == NODE_VAR_DECL) &&
+		    (node->data.var.var.qualifier > 0);
+	return case1 || case2;
+}
+
+int ast_is_pointerlike(AST* node){
+	int case2 = ((node->kind == NODE_VAR_USE) || (node->kind == NODE_VAR_DECL)) &&
+	            (node->data.var.var.qualifier == QUALIFIER_POINTER);
+	return ast_is_array(node) || case2;
+}
+
 Literal* ast_get_literal(AST* node){
 	switch(node->kind){
 		case NODE_ASSIGN:

@@ -173,9 +173,7 @@ FrameManager llvm_memory;
 void framemanager_init(void);
 void framemanager_destroy(void);
 int framemanager_read(AST* var);
-// int framemanager_readarray(AST* var, int idx);
 void framemanager_write(AST* var, int reg);
-// void framemanager_writearray(AST* var, int idx, int reg);
 void framemanager_push(AST* block);
 void framemanager_pop(AST* block);
 int framemanager_current_block(void);
@@ -226,7 +224,7 @@ int llvm_genIR_printlike_dummy(AST* ast, const char* fname);
 int llvm_genIR_printf(AST* ast);
 int llvm_genIR_scanf(AST* ast);
 int llvm_genIR_fcall(AST* ast);
-void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint);
+void llvm_genIR_fcall_arg(AST* arg, int reg, enum arghint hint);
 void llvm_genIR_block(AST* block);
 
 /* helpers */
@@ -344,7 +342,7 @@ int llvm_genIR_recursive(AST* root){
 		case NODE_ARRAY_VAL:
 		case NODE_NOCONV: //this type of node does not get included in the AST
 		case NODE_FUNC_PARAMLIST:
-		case NODE_FUNC_BODY: //has 0 or 1 children
+		case NODE_FUNC_BODY:
 			break ;
 
 
@@ -566,28 +564,33 @@ int llvm_genIR_varuse(AST* node){
 	enum Type node_type = ast_get_type(node);
 	const char* llvm_type = llvm_get_type(node_type);
 	int llvm_size = llvm_get_size(node_type);
-	int isarray = ast_get_children_count(node) > 0;
+	int indexedvariable = ast_get_children_count(node) > 0;
 	int regres = -1;
 
 	if(node_type != TYPE_FLT && node_type != TYPE_INT && node_type != TYPE_CHAR){
 		assert(0);
 	}
 
-	if(isarray){
-		//%v = getelementptr inbounds <llvm_type>, ptr %a, i64 <idx>
+	if(ast_is_array(node)){
+		regres = LLVM_NEW_INT_REG();
+		llvm_comment2("Reading %s array from memory", llvm_type);
+		if(var_in_global_scope(node)){
+			llvm_iprint("%%%d = getelementptr inbounds [%d x %s], ptr @g%d, i64 0, i64 0\n", regres, ast_get_data(node).var.var.qualifier, llvm_type, framemanager_read(node));
+		}
+		else{
+			llvm_iprint("%%%d = getelementptr inbounds [%d x %s], ptr %%%d, i64 0, i64 0\n", regres, ast_get_data(node).var.var.qualifier, llvm_type, framemanager_read(node));
+		}
+	}
+	else if(indexedvariable){
 		int idxreg = llvm_genIR_recursive(ast_get_child(node, 0));
-		// int tmpreg = LLVM_NEW_INT_REG();
 		int elemreg = LLVM_NEW_INT_REG();
 		regres = LLVM_NEW_INT_REG();
 
-		llvm_comment2("Reading %s array from memory", llvm_type, isarray);
+		llvm_comment2("Reading %s array from memory", llvm_type);
 		if(var_in_global_scope(node)){
-			// llvm_iprint("%%%d = load i32, ptr %%%d, align %d\n", tmpreg, idxreg, llvm_size);
 			llvm_iprint("%%%d = getelementptr inbounds %s, ptr @g%d, i32 %%%d\n", elemreg, llvm_type, framemanager_read(node), idxreg);
 		}
 		else{
-			// llvm_iprint("%%%d = load i32, ptr %%%d, align %d\n", tmpreg, idxreg, llvm_size);
-			// llvm_iprint("%%%d = getelementptr inbounds [%u x %s], [%u x %s]* %%%d, i32 0, i32 %%%d\n", elemreg, asize, llvm_type, asize, llvm_type, framemanager_read(node), idxreg);
 			llvm_iprint("%%%d = getelementptr inbounds %s, ptr %%%d, i32 %%%d\n", elemreg, llvm_type, framemanager_read(node), idxreg);
 		}
 		llvm_iprint("%%%d = load %s, ptr %%%d, align %d\n", regres, llvm_type, elemreg, llvm_size);
@@ -626,7 +629,6 @@ int llvm_genIR_assign(AST* node){
 		rhsreg = llvm_genIR_recursive(rhs);
 		AST* idx = ast_get_child(lhs, 0);
 		int idxreg = llvm_genIR_recursive(idx);
-		// int tmpreg = LLVM_NEW_INT_REG();
 		lhsreg = framemanager_read(lhs);
 		int elemreg = LLVM_NEW_INT_REG();
 
@@ -861,10 +863,10 @@ void llvm_genIR_function_definition(AST* fnode){
 	}
 	else{
 		child = ast_get_child(paramlist, 0);
-		llvm_print("(%s %%arg0", llvm_get_type(ast_get_type(child)));
+		llvm_print("(%s %%arg0", ast_is_pointerlike(child) ? "ptr" : llvm_get_type(ast_get_type(child)));
 		for(size_t i=1; i<nparams; i++){
 			child = ast_get_child(paramlist, i);
-			llvm_print(", %s %%arg%lu", llvm_get_type(ast_get_type(child)), i);
+			llvm_print(", %s %%arg%lu", ast_is_pointerlike(child) ? "ptr" : llvm_get_type(ast_get_type(child)), i);
 		}
 		llvm_print(")");
 	}
@@ -900,14 +902,30 @@ void llvm_genIR_function_definition(AST* fnode){
 			glueregs[i] = LLVM_NEW_INT_REG();
 			child = ast_get_child(paramlist, i);
 			argtype = ast_get_type(child);
-			// framemanager_write(child, gluereg1);
-			llvm_iprint("%%%d = alloca %s, align %d\n", glueregs[i], llvm_get_type(argtype), llvm_get_size(argtype));
-			llvm_iprint("store %s %%arg%lu, ptr %%%d, align %d\n", llvm_get_type(argtype), i, glueregs[i], llvm_get_size(argtype));
+			if(ast_is_pointerlike(child)){
+				llvm_iprint("%%%d = alloca ptr, align 8\n", glueregs[i]);
+				llvm_iprint("store ptr %%arg%lu, ptr %%%d, align 8\n", i, glueregs[i]);
+				int oldreg = glueregs[i];
+				glueregs[i] = LLVM_NEW_INT_REG();
+				llvm_iprint("%%%d = load ptr, ptr %%%d, align 8\n\n", glueregs[i], oldreg);
+			}
+			else{
+				llvm_iprint("%%%d = alloca %s, align %d\n", glueregs[i], llvm_get_type(argtype), llvm_get_size(argtype));
+				llvm_iprint("store %s %%arg%lu, ptr %%%d, align %d\n\n", llvm_get_type(argtype), i, glueregs[i], llvm_get_size(argtype));
+			}
 		}
 		llvm_print("\n");
 
+		//We have to perform a 'fake' execution of a function in order
+		//to build its body. The reason for that is because the
+		//generation of the funcbody code depends on registers
+		//which only exist during the function execution. More
+		//specifically, the code generation itself references
+		//registers which are obtained from the function Frame. For
+		//that reason, we first push a frame for this function,
+		//generate the code and then pop that frame.
+
 		framemanager_push(fblock);
-		// llvm_comment2("+++ Fake block %d entered\n", framemanager_current_block());
 
 		for(size_t i=0; i<nparams; i++){
 			child = ast_get_child(paramlist, i);
@@ -919,7 +937,6 @@ void llvm_genIR_function_definition(AST* fnode){
 			llvm_genIR_recursive(ast_get_child(fblock, i));
 		}
 
-		// llvm_comment2("--- Fake block %d exited\n", framemanager_current_block());
 		framemanager_pop(fblock);
 
 		indentLevel--;
@@ -942,19 +959,21 @@ int llvm_genIR_function_return(AST* ret){
 	//well, apparently this is needed for recursive calls.
 	//in other words, if we return 'reg', then the return value for this
 	//fcall won't be in an independet/separate temporary register, which
-	//will violate the SSA policy
+	//will violate the SSA policy (don't ask my why, this was proven to be
+	//true after testing this a lot)
 	int resreg = LLVM_NEW_INT_REG();
 
 	return resreg;
 }
 
 int llvm_genIR_printlike_dummy(AST* ast, const char* fname){
-	//  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0))
+	//printf call: %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0))
 	size_t childCount = ast_get_children_count(ast);
 	assert(childCount != 0);
 
 	llvm_comment2("+++ %s()\n", fname);
 
+	// generating the registers for the parameters prior to writing the paramlist
 	AST* child;
 	int argregs[childCount];
 	for(size_t i=0; i<childCount; i++){
@@ -967,17 +986,17 @@ int llvm_genIR_printlike_dummy(AST* ast, const char* fname){
 		}
 	}
 
+	// funcname
 	int reg1 = LLVM_NEW_INT_REG();
 	llvm_iprint("%%%d = call i32 (i8*, ...) @%s", reg1, fname);
 
+	// writing arglist
 	llvm_print("(");
-	enum Type ttype = ast_get_type(ast_get_child(ast, 0));
-	llvm_genIR_fcall_arg(ttype, argregs[0], ARG_FLT2DOUBLE);
+	llvm_genIR_fcall_arg(ast_get_child(ast, 0), argregs[0], ARG_FLT2DOUBLE);
 	if(childCount > 1){
 		for(size_t i=1; i<childCount; i++){
 			llvm_print(", ");
-			ttype = ast_get_type(ast_get_child(ast, i));
-			llvm_genIR_fcall_arg(ttype, argregs[i], ARG_FLT2DOUBLE);
+			llvm_genIR_fcall_arg(ast_get_child(ast, i), argregs[i], ARG_FLT2DOUBLE);
 		}
 	}
 	llvm_print(")\n");
@@ -1008,12 +1027,17 @@ int llvm_genIR_fcall(AST* ast){
 	if(childCount > 0){
 		AST* child;
 		int argregs[childCount];
-		enum Type argtype;
 
 		/* expanding arguments */
 		for(size_t i=0; i<childCount; i++){
 			child = ast_get_child(ast, i);
 			argregs[i] = llvm_genIR_recursive(child);
+			// if(ast_is_array(child)){
+			// 	argregs[i] = LLVM_NEW_INT_REG();
+			// 	llvm_iprint("%%%d = alloca [%d x %s]\n", argregs[i], ast_get_data(child).var.var.qualifier, llvm_get_type(ast_get_type(child)));
+			// 	argregs[i] = LLVM_NEW_INT_REG();
+			// 	llvm_iprint("%%%d = load [%d x %s], \n", argregs[i], ast_get_data(child).var.var.qualifier, llvm_get_type(ast_get_type(child)));
+			// }
 		}
 
 		/* writing llvm ir funccall */
@@ -1026,13 +1050,11 @@ int llvm_genIR_fcall(AST* ast){
 		}
 
 		//writing paramlist
-		argtype = ast_get_type(ast_get_child(ast, 0));
-		llvm_genIR_fcall_arg(argtype, argregs[0], ARG_NOHINT);
+		llvm_genIR_fcall_arg(ast_get_child(ast, 0), argregs[0], ARG_NOHINT);
 		if(childCount > 1){
 			for(size_t i=1; i<childCount; i++){
 				llvm_print(", ");
-				argtype = ast_get_type(ast_get_child(ast, i));
-				llvm_genIR_fcall_arg(argtype, argregs[i], ARG_NOHINT);
+				llvm_genIR_fcall_arg(ast_get_child(ast, i), argregs[i], ARG_NOHINT);
 			}
 		}
 		llvm_print(")\n");
@@ -1051,9 +1073,24 @@ int llvm_genIR_fcall(AST* ast){
 	return regret;
 }
 
-void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
+void llvm_genIR_fcall_arg(AST* arg, int reg, enum arghint hint){
+	enum Type ttype = ast_get_type(arg);
 	const char* llvmtname = llvm_get_type(ttype);
 	size_t chcount;
+	if(ast_is_array(arg)){
+		// llvm_print(
+		//     "%s* getelementptr inbounds ("
+		//     "[%lu x %s], "
+		//     "ptr %%%d, "
+		//     "i64 0, "
+		//     "i64 0)",
+		//     llvmtname, ast_get_data(arg).var.var.qualifier, llvmtname, reg
+		// );
+		llvm_print(
+		    "ptr noundef %%%d", reg
+		);
+		return ;
+	}
 	switch(ttype){
 		case TYPE_FLT:
 			if(hint == ARG_FLT2DOUBLE){
@@ -1067,12 +1104,12 @@ void llvm_genIR_fcall_arg(enum Type ttype, int reg, enum arghint hint){
 		case TYPE_STR:
 			chcount = count_chars(vector_get_item(stringliterals, reg));
 			llvm_print(
-			    "%s getelementptr inbounds ("
+			    "i8* getelementptr inbounds ("
 			    "[%lu x i8], "
 			    "[%lu x i8]* @.str%d, "
 			    "i64 0, "
 			    "i64 0)",
-			    llvmtname, chcount, chcount, reg
+			    chcount, chcount, reg
 			);
 			break;
 		default:
@@ -1130,14 +1167,9 @@ void llvm_IR_goto(const char* label){
 }
 
 void llvm_IR_condgoto(int reg, char* labeltrue, char* labelfalse){
-	// int testreg = LLVM_NEW_INT_REG();
-	// llvm_iprint("br i1 %%%d, label %%%s, label %%%s\n", testreg, iterlabel, escapelabel);
-
 	int testreg = LLVM_NEW_INT_REG();
 
-	// llvm_iprint("%%%d = trunc i32 %%%d to i1\n", testreg, reg);
 	llvm_iprint("%%%d = icmp ne i32 %%%d, 1\n", testreg, reg);
-
 	llvm_iprint("br i1 %%%d, label %%%s, label %%%s\n", testreg, labelfalse, labeltrue);
 }
 
@@ -1195,14 +1227,6 @@ int llvm_get_size(enum Type type){
 
 
 
-/* ARRAY */
-// int llvm_genIR_arrayval(){
-
-// 	return -1;
-// }
-
-
-
 /* MEMORY */
 
 void framemanager_init(void){
@@ -1218,7 +1242,6 @@ void framemanager_init(void){
 	Stack* blockframe = llvm_memory.blockframes[0];
 	llvm_memory.currentblock = 0;
 	unsigned sz = vartable_get_size(vt);
-	//assert(sz != 0);
 	BlockFrame* frame = frame_new(sz);
 	stack_push(blockframe, frame);
 }
@@ -1245,16 +1268,6 @@ int framemanager_read(AST* var){
 	return frame->addrs[v->reladdr];
 }
 
-// int framemanager_readarray(AST* var, int idx){
-// 	Scope* scope = ast_get_scope(var);
-// 	int scopeid = scope_get_id(scope);
-// 	Stack* blockframe = llvm_memory.blockframes[scopeid];
-// 	BlockFrame* frame = stack_top(blockframe);
-// 	Variable* v = ast_get_variable(var);
-// 	// printf("var %s (scope=%d) should be at %d... using reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
-// 	return frame->addrs[v->reladdr + idx];
-// }
-
 void framemanager_write(AST* var, int reg){
 	Scope* scope = ast_get_scope(var);
 	int scopeid = scope_get_id(scope);
@@ -1265,16 +1278,6 @@ void framemanager_write(AST* var, int reg){
 	frame->addrs[v->reladdr] = reg;
 	// printf("var %s (scope=%d) should be at %d... writing reg %d\n", v->name, scopeid, v->reladdr, frame->addrs[v->reladdr]);
 }
-
-// void framemanager_writearray(AST* var, int idx, int reg){
-// 	Scope* scope = ast_get_scope(var);
-// 	int scopeid = scope_get_id(scope);
-// 	Stack* blockframe = llvm_memory.blockframes[scopeid];
-// 	BlockFrame* frame = stack_top(blockframe);
-
-// 	Variable* v = ast_get_variable(var);
-// 	frame->addrs[v->reladdr + idx] = reg;
-// }
 
 void framemanager_push(AST* block){
 	Scope* scope = ast_get_scope(block);
@@ -1296,7 +1299,6 @@ void framemanager_pop(AST* block){
 }
 
 int framemanager_current_block(void){
-	// Stack* blockframe = llvm_memory.blockframes[llvm_memory.currentblock];
 	return llvm_memory.currentblock;
 }
 

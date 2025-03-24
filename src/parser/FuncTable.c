@@ -31,7 +31,9 @@ int func_table_add(FuncTable* table, char* name, Scope* scope, enum Type ret, in
 		if(func_is_defined(f)){
 			return -1;
 		}
-		func_add_definition(f, scope);
+		if(definition){
+			func_add_definition(f, scope);
+		}
 		return 0;
 	}
 

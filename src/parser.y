@@ -353,6 +353,7 @@ func_param_basic:
 
 func_param_array:
   type_specifier ID LBRACKET INTVAL RBRACKET { $$ = add_var_declaration($2, vartype, $4.value.i, NULL); }
+| type_specifier ID LBRACKET RBRACKET        { $$ = add_var_declaration($2, vartype, QUALIFIER_POINTER, NULL); }
 ;
 
 func_param_fp:
@@ -919,13 +920,14 @@ AST* ast_manager_assign_stmt_arr(char* name, AST* idx, AST* val){
 
 	AST* stmt = ast_new_node(NODE_ASSIGN);
 	AST* var = ast_manager_array_access(name, idx);
-	// AST* var = ast_manager_from_id(name);
 	NodeData data;
 	data.lit.type = ast_get_type(var);
-	// ast_add_child(var, idx);
 	ast_add_child(stmt, var);
-	ast_add_child(stmt, val);
 	ast_set_data(stmt, data);
+
+	TypeData tdata = typesys_assign(data.lit.type, ast_get_type(val));
+	AST* conv = ast_manager_add_conv(val, tdata.right);
+	ast_add_child(stmt, conv);
 	return stmt;
 }
 

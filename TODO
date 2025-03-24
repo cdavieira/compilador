@@ -8,6 +8,14 @@
 * [ ] implementar ponteiro?
 * [ ] criar função separada para o funcbody lol
 * [ ] criar função separada no parser.y que se encarregue de criar um NODE_BLOCK
+* [ ] portar todas as ocorrencias da variavel 'isarray' no arquivo backend/llvm.c
+para serem inicializadas usando a função 'ast_is_array' (em vez de logica
+espaghetti)
+* [ ] corrigir praticas de codigo ruins (como algumas já descritas) do backend/llvm.c
+* [ ] problema/duvida: como impedir de adicionar duplicatas de função durante a
+construção da AST? (muitas vezes não é possível saber uma função cuja
+declaração é adicionada na AST será definida mais tarde no arquivo, situação
+essa que iria necessitar substituir/remover o Nó de declaração da função da AST)
 
 /* 21/03 */
 * [*] fazer o dump da string table

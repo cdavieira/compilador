@@ -97,6 +97,8 @@ void ast_add_child(AST *parent, AST *child);
 int ast_has_literal(AST* node);
 int ast_has_var(AST* node);
 int ast_has_scope(AST* node);
+int ast_is_array(AST* node);
+int ast_is_pointerlike(AST* node);
 Literal* ast_get_literal(AST* node);
 Variable* ast_get_variable(AST* node);
 Scope* ast_get_scope(AST* node);
