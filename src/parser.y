@@ -58,7 +58,8 @@ void yyerror(char const *s);
 /* parser state (global variables) related */
 void parser_init(void);
 void parser_deinit(void);
-void parser_print(void);
+void parser_debug(void);
+void parser_print_ast(const char* filename);
 void parser_scope_enter(void);
 void parser_scope_exit(void);
 void fcall_start(char* name, int check);
@@ -496,17 +497,18 @@ void parser_deinit(void){
 	stack_destroy(&ast_block_history, free);
 }
 
-void parser_print(void){
+void parser_debug(void){
 #ifdef DEBUG_PARSER
 	scope_manager_print(scope_manager);
 	func_table_print(functable);
-#endif
-#ifdef DEBUG_AST
 	ast_print(root);
-	FILE* fpout = fopen("tmp.dot", "w");
+#endif
+}
+
+void parser_print_ast(const char* filename){
+	FILE* fpout = fopen(filename, "w");
 	ast_export_dot(root, fpout);
 	fclose(fpout);
-#endif
 }
 
 void parser_scope_enter(void){

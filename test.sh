@@ -24,7 +24,7 @@ test_file(){
 	# $3 = 0 if test should succeed, 1 otherwise
 	# $4 = 0 if should show output, 1 otherwise
 
-	$1 <$2 &>/dev/null
+	$1 ll <$2 &>/dev/null
 	local result=$?
 
 	# if result != 0, then the test failed

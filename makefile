@@ -31,10 +31,6 @@ CFLAGS := -Wall -I$(srcdir)/lib
 # CFLAGS += -DDEBUG_PARSER
 # Add debug information about the resulting type of each expression 
 # CFLAGS += -DDEBUG_EXPR_TYPE
-# Add debug information about the AST
-# CFLAGS += -DDEBUG_AST
-# Add LLVM IR code gen
-CFLAGS += -DGEN_LLVM
 
 
 flex_src := $(srcdir)/src/lexer.yy.c
@@ -47,7 +43,7 @@ FLEXFLAGS += --noline
 
 bison_src := $(srcdir)/src/parser.tab.c
 bison_hdr := $(srcdir)/lib/parser.tab.h
-bison_log := $(srcdir)/parser/parser.log
+bison_log := $(srcdir)/src/parser.log
 bison_files := $(bison_src) $(bison_hdr) $(bison_log)
 BISON := bison
 BISONFLAGS := 
@@ -91,20 +87,21 @@ $(flex_src): $(lfile)
 	$(FLEX) $(FLEXFLAGS) -o $@ $<
 
 run:
-	./$(parsername) <$(testfile) 2> $(bison_log)
+	./$(parsername) <$(testfile) 2>$(bison_log)
 	@echo "Output saved to: $(bison_log)"
 
 pdf: clean all
-	./$(parsername) <$(testfile)
+	./$(parsername) dot <$(testfile)
 	dot -Tpdf tmp.dot > $(notdir $(testfile)).pdf
 	rm tmp.dot
 
 # clang -S -emit-llvm main.c
 ll: clean all
-	./$(parsername) <$(testfile)
+	./$(parsername) ll <$(testfile)
 	cp tmp.ll $(notdir $(testfile)).ll
 	rm tmp.ll
 	llc -relocation-model=pic $(notdir $(testfile)).ll
+	gcc $(notdir $(testfile)).s
 
 val:
 	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < $(testfile)
@@ -118,6 +115,8 @@ clean:
 	@rm -f $(lexername)
 	@rm -f $(flex_files)
 	@rm -f $(bison_files)
+	@rm -f $(bison_log)
+	@rm -f $(wildcard *.ll) $(wildcard *.pdf) $(wildcard *.s) a.out
 
 echo:
 	@echo "src: $(src)"

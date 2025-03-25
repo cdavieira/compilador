@@ -798,7 +798,7 @@ void llvm_genIR_if(AST* ast){
 	}
 	llvm_IR_label(escapelabel);
 
-	llvm_comment1("--- if");
+	llvm_comment1("--- if\n");
 }
 
 void llvm_genIR_while(AST* ast){
@@ -828,7 +828,7 @@ void llvm_genIR_while(AST* ast){
 	llvm_IR_goto(condlabel);
 
 	llvm_IR_label(escapelabel);
-	llvm_comment1("--- while");
+	llvm_comment1("--- while\n");
 }
 
 
@@ -874,26 +874,20 @@ void llvm_genIR_function_definition(AST* fnode){
 	//func body
 	AST* fbody = ast_get_child(fnode, 1);
 	AST* fblock = ast_get_child(fbody, 0);
-	if(fblock == NULL){
+	int nobody = fblock == NULL;
+	int noparams = nparams == 0;
+
+	llvm_print("{\n");
+	indentLevel++;
+	if(nobody){
 		//the function return type is void when it is defined but it
 		//doesn't have a block
-		llvm_print("{\n");
-		indentLevel++;
 		llvm_iprint("ret void\n");
-		indentLevel--;
-		llvm_print("}\n\n");
 	}
-	else if(nparams == 0){
-		llvm_print("{\n");
-		indentLevel++;
+	else if(noparams){
 		llvm_genIR_block(fblock);
-		indentLevel--;
-		llvm_print("}\n\n");
 	}
 	else{
-		llvm_print("{\n");
-		indentLevel++;
-
 		llvm_comment1("Generating arglist glue");
 		int glueregs[nparams];
 		enum Type argtype;
@@ -938,10 +932,9 @@ void llvm_genIR_function_definition(AST* fnode){
 		}
 
 		framemanager_pop(fblock);
-
-		indentLevel--;
-		llvm_print("}\n\n");
 	}
+	indentLevel--;
+	llvm_print("}\n\n");
 }
 
 int llvm_genIR_function_return(AST* ret){
@@ -1032,12 +1025,6 @@ int llvm_genIR_fcall(AST* ast){
 		for(size_t i=0; i<childCount; i++){
 			child = ast_get_child(ast, i);
 			argregs[i] = llvm_genIR_recursive(child);
-			// if(ast_is_array(child)){
-			// 	argregs[i] = LLVM_NEW_INT_REG();
-			// 	llvm_iprint("%%%d = alloca [%d x %s]\n", argregs[i], ast_get_data(child).var.var.qualifier, llvm_get_type(ast_get_type(child)));
-			// 	argregs[i] = LLVM_NEW_INT_REG();
-			// 	llvm_iprint("%%%d = load [%d x %s], \n", argregs[i], ast_get_data(child).var.var.qualifier, llvm_get_type(ast_get_type(child)));
-			// }
 		}
 
 		/* writing llvm ir funccall */
@@ -1078,14 +1065,6 @@ void llvm_genIR_fcall_arg(AST* arg, int reg, enum arghint hint){
 	const char* llvmtname = llvm_get_type(ttype);
 	size_t chcount;
 	if(ast_is_array(arg)){
-		// llvm_print(
-		//     "%s* getelementptr inbounds ("
-		//     "[%lu x %s], "
-		//     "ptr %%%d, "
-		//     "i64 0, "
-		//     "i64 0)",
-		//     llvmtname, ast_get_data(arg).var.var.qualifier, llvmtname, reg
-		// );
 		llvm_print(
 		    "ptr noundef %%%d", reg
 		);
