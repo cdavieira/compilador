@@ -6,7 +6,7 @@
 void parser_init();
 void parser_deinit();
 void parser_debug();
-void parser_print_ast();
+void parser_print_ast(const char* );
 void lexer_init();
 void lexer_deinit();
 
