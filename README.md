@@ -69,6 +69,7 @@ make clean
 ## Referências
 * as aulas e materiais :)
 * [Gramatica do C](https://www.lysator.liu.se/c/ANSI-C-grammar-y.html)
+* [Gramatica do C segundo 'The C Programming Language'](https://en.wikipedia.org/wiki/The_C_Programming_Language)
 * [Gramatica de constant expressions - cppreference](https://en.cppreference.com/w/c/language/constant_expression)
 * [Gramatica de expressoes - cppreference](https://en.cppreference.com/w/c/language/expressions)
 * ['%define' - bison](https://www.gnu.org/software/bison/manual/html_node/_0025define-Summary.html)
