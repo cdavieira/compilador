@@ -66,6 +66,11 @@ BISONFLAGS += -Wconflicts-sr
 VALGRIND := valgrind
 VALGRINDFLAGS := --leak-check=full --show-leak-kinds=all -s
 
+DOT := dot
+
+LCC := lcc
+LCCFLAGS := -relocation-model=pic
+
 all: prologue $(parsername) $(lexername)
 
 prologue:
@@ -91,8 +96,8 @@ run:
 	@echo "Output saved to: $(bison_log)"
 
 pdf: clean all
-	./$(parsername) dot <$(testfile)
-	dot -Tpdf tmp.dot > $(notdir $(testfile)).pdf
+	./$(parsername) $(DOT) <$(testfile)
+	$(DOT) -Tpdf tmp.dot > $(notdir $(testfile)).pdf
 	rm tmp.dot
 
 # clang -S -emit-llvm main.c
@@ -100,8 +105,8 @@ ll: clean all
 	./$(parsername) ll <$(testfile)
 	cp tmp.ll $(notdir $(testfile)).ll
 	rm tmp.ll
-	llc -relocation-model=pic $(notdir $(testfile)).ll
-	gcc $(notdir $(testfile)).s
+	$(LLC) $(LCCFLAGS) $(notdir $(testfile)).ll
+	$(CC) $(notdir $(testfile)).s
 
 val:
 	@$(VALGRIND) $(VALGRINDFLAGS) ./$(parsername) < $(testfile)
